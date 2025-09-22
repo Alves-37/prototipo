@@ -52,6 +52,16 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Erro interno do servidor' });
 });
 
+// Rota raiz para responder no domínio base
+app.get('/', (req, res) => {
+  res.json({
+    status: 'OK',
+    message: 'API Nevú online',
+    docs: '/api/health',
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // Rota para verificar se a API está funcionando
 app.get('/api/health', (req, res) => {
   res.json({ 

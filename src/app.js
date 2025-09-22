@@ -57,18 +57,10 @@ app.get('/', (req, res) => {
   res.json({
     status: 'OK',
     message: 'API Nevú online',
-    docs: '/api/health',
     timestamp: new Date().toISOString(),
   });
 });
 
-// Rota para verificar se a API está funcionando
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    message: 'API Nevú funcionando corretamente',
-    timestamp: new Date().toISOString()
-  });
-});
+// (Removida) Rota /api/health para manter apenas a raiz como endpoint de status
 
 module.exports = app;

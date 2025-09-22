@@ -1,0 +1,24 @@
+# Ignore local dependencies and caches
+node_modules
+npm-debug.log
+
+# Ignore local env and secrets
+.env
+.env.*
+
+# Ignore sqlite database files (not used in Railway)
+*.sqlite
+*.sqlite-journal
+
+# Ignore uploads (if present locally)
+uploads
+
+# Git
+.git
+.gitignore
+
+# OS/Editor files
+.DS_Store
+Thumbs.db
+.vscode
+.idea

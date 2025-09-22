@@ -35,6 +35,14 @@ out/
 .env
 .env.*.local
 
+# Database files (local only)
+*.sqlite
+*.sqlite-journal
+nevu.sqlite
+
+# Local uploads directory
+uploads/
+
 # System files
 .DS_Store
 Thumbs.db

@@ -1,4 +1,5 @@
-const { Chamado, RespostaChamado, User } = require('../models');
+const { Chamado, RespostaChamado, User, Notificacao } = require('../models');
+
 const { Op } = require('sequelize');
 
 // Listar todos os chamados com filtros
@@ -204,6 +205,27 @@ exports.criar = async (req, res) => {
         }
       ]
     });
+
+    // Notificar empresas sobre novo chamado (público-alvo padrão)
+    try {
+      const empresas = await User.findAll({ where: { tipo: 'empresa' }, attributes: ['id'] });
+      if (empresas.length > 0) {
+        const tituloNotif = `Novo chamado: ${titulo}`;
+        const msgNotif = `${req.user.nome} publicou um novo chamado: "${titulo}"`;
+        await Notificacao.bulkCreate(
+          empresas.map(u => ({
+            usuarioId: u.id,
+            tipo: 'chamado_novo',
+            titulo: tituloNotif,
+            mensagem: msgNotif,
+            dados: { chamadoId: chamado.id, categoria },
+          })),
+          { validate: false }
+        );
+      }
+    } catch (e) {
+      console.warn('Aviso: falha ao gerar notificações de novo chamado:', e.message);
+    }
 
     res.status(201).json(chamadoCompleto);
   } catch (error) {

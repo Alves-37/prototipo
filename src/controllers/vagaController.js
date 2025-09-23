@@ -1,4 +1,5 @@
-const { Vaga, User, Candidatura } = require('../models');
+const { Vaga, User, Candidatura, Notificacao } = require('../models');
+
 const { Op } = require('sequelize');
 
 // Listar todas as vagas públicas (para candidatos)
@@ -205,7 +206,28 @@ exports.criar = async (req, res) => {
         }
       ]
     });
-    
+
+    // Notificar todos os usuários (candidatos) sobre a nova vaga
+    try {
+      const candidatos = await User.findAll({ where: { tipo: 'usuario' }, attributes: ['id'] });
+      if (candidatos.length > 0) {
+        const tituloNotif = `Nova vaga: ${titulo}`;
+        const msgNotif = `A empresa ${empresa?.nome || ''} publicou a vaga "${titulo}"`;
+        await Notificacao.bulkCreate(
+          candidatos.map(u => ({
+            usuarioId: u.id,
+            tipo: 'vaga_nova',
+            titulo: tituloNotif,
+            mensagem: msgNotif,
+            dados: { vagaId: vaga.id, empresaId, area },
+          })),
+          { validate: false }
+        );
+      }
+    } catch (e) {
+      console.warn('Aviso: falha ao gerar notificações de nova vaga:', e.message);
+    }
+
     res.status(201).json(vagaCompleta);
   } catch (error) {
     console.error('Erro ao criar vaga:', error);

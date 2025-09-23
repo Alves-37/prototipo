@@ -12,6 +12,7 @@ const userRoutes = require('./routes/userRoutes');
 const empresaRoutes = require('./routes/empresaRoutes');
 const chamadoRoutes = require('./routes/chamadoRoutes');
 const mensagemRoutes = require('./routes/mensagens');
+const notificacaoRoutes = require('./routes/notificacaoRoutes');
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/empresas', empresaRoutes);
 app.use('/api/chamados', chamadoRoutes);
 app.use('/api/mensagens', mensagemRoutes);
+app.use('/api/notificacoes', notificacaoRoutes);
 
 // Middleware de tratamento de erros
 app.use((err, req, res, next) => {

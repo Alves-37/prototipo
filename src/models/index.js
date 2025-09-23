@@ -6,6 +6,7 @@ const Chamado = require('./Chamado');
 const RespostaChamado = require('./RespostaChamado');
 const Mensagem = require('./Mensagem');
 const Conversa = require('./Conversa');
+const Notificacao = require('./Notificacao');
 
 // Associação: Uma empresa (User) tem muitas Vagas
 User.hasMany(Vaga, { foreignKey: 'empresaId', as: 'vagas' });
@@ -44,6 +45,10 @@ Conversa.belongsTo(Vaga, { foreignKey: 'vagaId', as: 'vaga' });
 Conversa.hasMany(Mensagem, { foreignKey: 'conversaId', sourceKey: 'conversaId', as: 'mensagens' });
 Mensagem.belongsTo(Conversa, { foreignKey: 'conversaId', targetKey: 'conversaId', as: 'conversa' });
 
+// Associações de notificações
+User.hasMany(Notificacao, { foreignKey: 'usuarioId', as: 'notificacoes' });
+Notificacao.belongsTo(User, { foreignKey: 'usuarioId', as: 'usuario' });
+
 const syncDb = async () => {
   try {
     if (process.env.NODE_ENV === 'production') {
@@ -81,4 +86,4 @@ const syncDb = async () => {
   }
 };
 
-module.exports = { sequelize, User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, syncDb };
+module.exports = { sequelize, User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, syncDb };

@@ -1,4 +1,4 @@
-const { Candidatura, Vaga, User } = require('../models');
+const { Candidatura, Vaga, User, Notificacao } = require('../models');
 
 // Candidato se candidata a uma vaga
 exports.criar = async (req, res) => {
@@ -268,7 +268,23 @@ exports.atualizarFase = async (req, res) => {
         { model: Vaga, as: 'vaga', attributes: ['id', 'titulo', 'empresaId'] }
       ]
     });
-    
+
+    // Notificar o candidato específico sobre mudança de fase
+    try {
+      const faseTitulo = fase.replace(/_/g, ' ');
+      const tituloNotif = `Sua candidatura foi atualizada: ${faseTitulo}`;
+      const msgNotif = `A vaga "${candidaturaAtualizada.vaga.titulo}" alterou sua candidatura para: ${faseTitulo}.`;
+      await Notificacao.create({
+        usuarioId: candidaturaAtualizada.usuario.id,
+        tipo: 'candidatura_fase',
+        titulo: tituloNotif,
+        mensagem: msgNotif,
+        dados: { candidaturaId: candidaturaAtualizada.id, vagaId: candidaturaAtualizada.vaga.id, fase }
+      });
+    } catch (e) {
+      console.warn('Aviso: falha ao gerar notificação de fase de candidatura:', e.message);
+    }
+
     res.json(candidaturaAtualizada);
     
   } catch (error) {

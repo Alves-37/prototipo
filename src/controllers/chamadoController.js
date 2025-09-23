@@ -206,25 +206,22 @@ exports.criar = async (req, res) => {
       ]
     });
 
-    // Notificar empresas sobre novo chamado (público-alvo padrão)
+    // Disparar notificações para todas as empresas
     try {
-      const empresas = await User.findAll({ where: { tipo: 'empresa' }, attributes: ['id'] });
-      if (empresas.length > 0) {
-        const tituloNotif = `Novo chamado: ${titulo}`;
-        const msgNotif = `${req.user.nome} publicou um novo chamado: "${titulo}"`;
-        await Notificacao.bulkCreate(
-          empresas.map(u => ({
-            usuarioId: u.id,
-            tipo: 'chamado_novo',
-            titulo: tituloNotif,
-            mensagem: msgNotif,
-            dados: { chamadoId: chamado.id, categoria },
-          })),
-          { validate: false }
-        );
+      const empresas = await User.findAll({ where: { tipo: 'empresa' }, attributes: ['id', 'nome'] });
+      const notifs = empresas.map(emp => ({
+        usuarioId: emp.id,
+        tipo: 'chamado_publicado',
+        titulo: 'Novo chamado publicado',
+        mensagem: `${req.user.nome} publicou o chamado: ${chamadoCompleto.titulo}`,
+        referenciaTipo: 'chamado',
+        referenciaId: chamadoCompleto.id,
+      }));
+      if (notifs.length > 0) {
+        await Notificacao.bulkCreate(notifs, { validate: true });
       }
     } catch (e) {
-      console.warn('Aviso: falha ao gerar notificações de novo chamado:', e.message);
+      console.warn('Aviso: falha ao criar notificações de novo chamado:', e.message);
     }
 
     res.status(201).json(chamadoCompleto);
@@ -353,6 +350,22 @@ exports.adicionarResposta = async (req, res) => {
         }
       ]
     });
+
+    // Notificar o autor do chamado sobre a nova resposta
+    try {
+      if (chamado && chamado.usuarioId) {
+        await Notificacao.create({
+          usuarioId: chamado.usuarioId,
+          tipo: 'sistema',
+          titulo: 'Nova resposta ao seu chamado',
+          mensagem: `${respostaCompleta?.usuario?.nome || 'Um usuário'} respondeu ao chamado: ${chamado.titulo}`,
+          referenciaTipo: 'chamado',
+          referenciaId: chamado.id,
+        });
+      }
+    } catch (e) {
+      console.warn('Aviso: falha ao criar notificação de nova resposta de chamado:', e.message);
+    }
 
     res.status(201).json(respostaCompleta);
   } catch (error) {

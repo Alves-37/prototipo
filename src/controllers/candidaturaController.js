@@ -59,6 +59,23 @@ exports.criar = async (req, res) => {
 
     // Não atualizar status da capacidade aqui - será atualizado quando candidatos forem aprovados
     
+    // Disparar notificação para a EMPRESA dona da vaga
+    try {
+      const vagaNot = await Vaga.findByPk(vagaId);
+      if (vagaNot && vagaNot.empresaId) {
+        await Notificacao.create({
+          usuarioId: vagaNot.empresaId,
+          tipo: 'candidatura_fase',
+          titulo: 'Nova candidatura recebida',
+          mensagem: `Você recebeu uma nova candidatura para a vaga: ${vagaNot.titulo || 'Vaga'}`,
+          referenciaTipo: 'candidatura',
+          referenciaId: candidatura.id,
+        });
+      }
+    } catch (e) {
+      console.warn('Aviso: falha ao criar notificação de nova candidatura:', e.message);
+    }
+
     res.status(201).json(candidatura);
   } catch (error) {
     console.error('Erro ao criar candidatura:', error);
@@ -261,6 +278,20 @@ exports.atualizarFase = async (req, res) => {
       await vagaController.atualizarStatusCapacidade(candidatura.vagaId);
     }
     
+    // Disparar notificação para o usuário sobre mudança de fase
+    try {
+      await Notificacao.create({
+        usuarioId: candidatura.usuario.id,
+        tipo: 'candidatura_fase',
+        titulo: 'Atualização na sua candidatura',
+        mensagem: `Sua candidatura para "${candidatura.vaga.titulo}" mudou para a fase: ${fase}`,
+        referenciaTipo: 'candidatura',
+        referenciaId: candidatura.id,
+      });
+    } catch (e) {
+      console.warn('Aviso: falha ao criar notificação de fase da candidatura:', e.message);
+    }
+
     // Retornar candidatura atualizada
     const candidaturaAtualizada = await Candidatura.findByPk(id, {
       include: [
@@ -268,23 +299,7 @@ exports.atualizarFase = async (req, res) => {
         { model: Vaga, as: 'vaga', attributes: ['id', 'titulo', 'empresaId'] }
       ]
     });
-
-    // Notificar o candidato específico sobre mudança de fase
-    try {
-      const faseTitulo = fase.replace(/_/g, ' ');
-      const tituloNotif = `Sua candidatura foi atualizada: ${faseTitulo}`;
-      const msgNotif = `A vaga "${candidaturaAtualizada.vaga.titulo}" alterou sua candidatura para: ${faseTitulo}.`;
-      await Notificacao.create({
-        usuarioId: candidaturaAtualizada.usuario.id,
-        tipo: 'candidatura_fase',
-        titulo: tituloNotif,
-        mensagem: msgNotif,
-        dados: { candidaturaId: candidaturaAtualizada.id, vagaId: candidaturaAtualizada.vaga.id, fase }
-      });
-    } catch (e) {
-      console.warn('Aviso: falha ao gerar notificação de fase de candidatura:', e.message);
-    }
-
+    
     res.json(candidaturaAtualizada);
     
   } catch (error) {

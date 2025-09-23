@@ -1,5 +1,4 @@
 const { Vaga, User, Candidatura, Notificacao } = require('../models');
-
 const { Op } = require('sequelize');
 
 // Listar todas as vagas públicas (para candidatos)
@@ -207,25 +206,22 @@ exports.criar = async (req, res) => {
       ]
     });
 
-    // Notificar todos os usuários (candidatos) sobre a nova vaga
+    // Disparar notificações para todos os usuários (candidatos)
     try {
-      const candidatos = await User.findAll({ where: { tipo: 'usuario' }, attributes: ['id'] });
-      if (candidatos.length > 0) {
-        const tituloNotif = `Nova vaga: ${titulo}`;
-        const msgNotif = `A empresa ${empresa?.nome || ''} publicou a vaga "${titulo}"`;
-        await Notificacao.bulkCreate(
-          candidatos.map(u => ({
-            usuarioId: u.id,
-            tipo: 'vaga_nova',
-            titulo: tituloNotif,
-            mensagem: msgNotif,
-            dados: { vagaId: vaga.id, empresaId, area },
-          })),
-          { validate: false }
-        );
+      const usuarios = await User.findAll({ where: { tipo: 'usuario' }, attributes: ['id'] });
+      const notifs = usuarios.map(u => ({
+        usuarioId: u.id,
+        tipo: 'vaga_publicada',
+        titulo: 'Nova vaga publicada',
+        mensagem: `A empresa ${vagaCompleta.empresa?.nome || ''} publicou a vaga: ${vagaCompleta.titulo}`.trim(),
+        referenciaTipo: 'vaga',
+        referenciaId: vagaCompleta.id,
+      }));
+      if (notifs.length > 0) {
+        await Notificacao.bulkCreate(notifs, { validate: true });
       }
     } catch (e) {
-      console.warn('Aviso: falha ao gerar notificações de nova vaga:', e.message);
+      console.warn('Aviso: falha ao criar notificações de nova vaga:', e.message);
     }
 
     res.status(201).json(vagaCompleta);

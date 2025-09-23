@@ -3,22 +3,19 @@ const router = express.Router();
 const { authMiddleware } = require('../middlewares/auth');
 const notificacaoController = require('../controllers/notificacaoController');
 
-// Todas as rotas requerem autenticação
+// Todas as rotas exigem autenticação
 router.use(authMiddleware);
 
-// Listar notificações do usuário
+// GET /api/notificacoes
 router.get('/', notificacaoController.listar);
 
-// Contar não lidas
-router.get('/count', notificacaoController.contarNaoLidas);
+// PUT /api/notificacoes/:id/lida
+router.put('/:id/lida', notificacaoController.marcarComoLida);
 
-// Marcar uma notificação como lida
-router.put('/:id/read', notificacaoController.marcarLida);
+// PUT /api/notificacoes/lidas
+router.put('/lidas', notificacaoController.marcarTodasComoLidas);
 
-// Marcar todas como lidas
-router.put('/read-all', notificacaoController.marcarTodas);
-
-// Excluir uma notificação
-router.delete('/:id', notificacaoController.excluir);
+// DELETE /api/notificacoes
+router.delete('/', notificacaoController.limpar);
 
 module.exports = router;

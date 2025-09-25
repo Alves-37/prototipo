@@ -206,14 +206,21 @@ exports.criar = async (req, res) => {
       ]
     });
 
-    // Disparar notificações para todas as empresas
+    // Disparar notificações para TODOS os outros usuários (candidatos e empresas), exceto o autor
     try {
-      const empresas = await User.findAll({ where: { tipo: 'empresa' }, attributes: ['id', 'nome'] });
-      const notifs = empresas.map(emp => ({
-        usuarioId: emp.id,
+      const sanitize = (s) => (typeof s === 'string' ? s.replace(/<[^>]*>/g, '').trim() : s);
+      const autorNome = sanitize(req.user?.nome || 'Um usuário');
+      const chamadoTitulo = sanitize(chamadoCompleto?.titulo || 'Chamado');
+
+      const destinatarios = await User.findAll({ 
+        where: { id: { [Op.ne]: req.user.id } },
+        attributes: ['id']
+      });
+      const notifs = destinatarios.map(u => ({
+        usuarioId: u.id,
         tipo: 'chamado_publicado',
         titulo: 'Novo chamado publicado',
-        mensagem: `${req.user.nome} publicou o chamado: ${chamadoCompleto.titulo}`,
+        mensagem: `${autorNome} publicou o chamado: ${chamadoTitulo}`,
         referenciaTipo: 'chamado',
         referenciaId: chamadoCompleto.id,
       }));

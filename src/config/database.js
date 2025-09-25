@@ -1,39 +1,37 @@
 const { Sequelize } = require('sequelize');
 require('dotenv').config();
 
-// Prefer DATABASE_PUBLIC_URL (public proxy) for local dev; fallback to DATABASE_URL (internal) for cloud
+// Prefer DATABASE_PUBLIC_URL (proxy pública Railway). Fallback para DATABASE_URL (host interno Railway).
+// Importante: sem fallback para SQLite para garantir uso exclusivo de PostgreSQL.
 const connectionUri = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
 
 let sequelize;
 
-if (connectionUri) {
-  const useSSL = process.env.DATABASE_SSL === 'true' || process.env.NODE_ENV === 'production';
-  sequelize = new Sequelize(connectionUri, {
-    dialect: 'postgres',
-    protocol: 'postgres',
-    logging: false,
-    dialectOptions: useSSL
-      ? {
-          ssl: {
-            require: true,
-            rejectUnauthorized: false,
-          },
-        }
-      : {},
-    pool: {
-      max: 10,
-      min: 0,
-      acquire: 30000,
-      idle: 10000,
-    },
-  });
-} else {
-  // Fallback local development using SQLite if no DATABASE_URL is provided
-  sequelize = new Sequelize({
-    dialect: 'sqlite',
-    storage: process.env.DB_STORAGE || './nevu.sqlite',
-    logging: false,
-  });
+if (!connectionUri) {
+  throw new Error('DATABASE_PUBLIC_URL ou DATABASE_URL não configurados. Defina as variáveis para o PostgreSQL do Railway.');
 }
+
+// Forçar SSL para compatibilidade com a proxy pública do Railway
+const useSSL = true;
+
+sequelize = new Sequelize(connectionUri, {
+  dialect: 'postgres',
+  protocol: 'postgres',
+  logging: false,
+  dialectOptions: useSSL
+    ? {
+        ssl: {
+          require: true,
+          rejectUnauthorized: false,
+        },
+      }
+    : {},
+  pool: {
+    max: 10,
+    min: 0,
+    acquire: 30000,
+    idle: 10000,
+  },
+});
 
 module.exports = sequelize;

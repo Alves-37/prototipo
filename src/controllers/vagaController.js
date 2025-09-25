@@ -206,14 +206,19 @@ exports.criar = async (req, res) => {
       ]
     });
 
+    // Helper para sanitizar strings removendo tags HTML
+    const sanitize = (s) => (typeof s === 'string' ? s.replace(/<[^>]*>/g, '').trim() : s);
+
     // Disparar notificações para todos os usuários (candidatos)
     try {
       const usuarios = await User.findAll({ where: { tipo: 'usuario' }, attributes: ['id'] });
+      const empresaNome = sanitize(vagaCompleta.empresa?.nome || 'Empresa');
+      const vagaTitulo = sanitize(vagaCompleta.titulo || 'Vaga');
       const notifs = usuarios.map(u => ({
         usuarioId: u.id,
         tipo: 'vaga_publicada',
         titulo: 'Nova vaga publicada',
-        mensagem: `A empresa ${vagaCompleta.empresa?.nome || ''} publicou a vaga: ${vagaCompleta.titulo}`.trim(),
+        mensagem: `A empresa ${empresaNome} publicou a vaga: ${vagaTitulo}`,
         referenciaTipo: 'vaga',
         referenciaId: vagaCompleta.id,
       }));

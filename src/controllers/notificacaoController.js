@@ -34,7 +34,8 @@ exports.listar = async (req, res) => {
       totalPages: Math.ceil(count / limitNum)
     });
   } catch (err) {
-    console.error('Erro ao listar notificações:', err && (err.stack || err.message || err));
+    console.error('Erro ao listar notificações:', (err && (err.original?.message || err.parent?.message || err.message)) || err);
+    if (err && err.stack) console.error(err.stack);
     res.status(500).json({ error: 'Erro ao listar notificações' });
   }
 };

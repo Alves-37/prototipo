@@ -2,10 +2,20 @@ const express = require('express');
 const router = express.Router();
 const candidaturaController = require('../controllers/candidaturaController');
 const { authMiddleware, empresaMiddleware } = require('../middlewares/auth');
-const { uploadCurriculo } = require('../middlewares/upload');
+const { upload } = require('../middlewares/upload');
 
 // Candidato se candidata a uma vaga (precisa estar autenticado)
-router.post('/', authMiddleware, uploadCurriculo.single('curriculo'), candidaturaController.criar);
+// Aceita múltiplos arquivos: curriculo (opcional), documentoFrente (obrigatório), documentoVerso (obrigatório)
+router.post(
+  '/',
+  authMiddleware,
+  upload.fields([
+    { name: 'curriculo', maxCount: 1 },
+    { name: 'documentoFrente', maxCount: 1 },
+    { name: 'documentoVerso', maxCount: 1 },
+  ]),
+  candidaturaController.criar
+);
 
 // Candidato lista suas próprias candidaturas
 router.get('/usuario', authMiddleware, candidaturaController.listarPorUsuario);

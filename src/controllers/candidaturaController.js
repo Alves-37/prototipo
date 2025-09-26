@@ -30,11 +30,17 @@ exports.criar = async (req, res) => {
       });
     }
 
-    // Processar arquivo de currículo se enviado
-    let curriculoPath = null;
-    if (req.file) {
-      curriculoPath = req.file.filename; // Nome do arquivo salvo
-      
+    // Processar uploads (currículo opcional, documentos frente/verso obrigatórios)
+    const files = req.files || {};
+    const curriculoPath = Array.isArray(files.curriculo) && files.curriculo[0] ? files.curriculo[0].filename : null;
+    const documentoFrente = Array.isArray(files.documentoFrente) && files.documentoFrente[0] ? files.documentoFrente[0].filename : null;
+    const documentoVerso = Array.isArray(files.documentoVerso) && files.documentoVerso[0] ? files.documentoVerso[0].filename : null;
+
+    if (!documentoFrente || !documentoVerso) {
+      return res.status(400).json({ error: 'Documento de identificação frente e verso são obrigatórios.' });
+    }
+
+    if (curriculoPath) {
       // Atualizar o currículo do usuário
       await User.update(
         { curriculo: curriculoPath },
@@ -49,6 +55,8 @@ exports.criar = async (req, res) => {
       telefone,
       linkedin,
       disponibilidade,
+      documentoFrente,
+      documentoVerso,
       fase: 'recebida',
       historicoFases: JSON.stringify([{
         fase: 'recebida',

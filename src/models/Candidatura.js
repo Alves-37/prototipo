@@ -76,18 +76,14 @@ const Candidatura = sequelize.define('Candidatura', {
     type: DataTypes.STRING,
     allowNull: true
   },
-  
-  // Campos específicos para cada fase
-  dataEntrevista: {
-    type: DataTypes.DATE,
-    allowNull: true
-  },
-  localEntrevista: {
+  // Documentos obrigatórios (armazenar nome do arquivo). Vamos manter allowNull true por compatibilidade,
+  // e validar no controller para não quebrar dados existentes.
+  documentoFrente: {
     type: DataTypes.STRING,
     allowNull: true
   },
-  observacoesEmpresa: {
-    type: DataTypes.TEXT,
+  documentoVerso: {
+    type: DataTypes.STRING,
     allowNull: true
   },
   feedbackEntrevista: {

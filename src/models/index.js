@@ -7,6 +7,7 @@ const RespostaChamado = require('./RespostaChamado');
 const Mensagem = require('./Mensagem');
 const Conversa = require('./Conversa');
 const Notificacao = require('./Notificacao');
+const Denuncia = require('./Denuncia');
 
 // Associação: Uma empresa (User) tem muitas Vagas
 User.hasMany(Vaga, { foreignKey: 'empresaId', as: 'vagas' });
@@ -80,10 +81,9 @@ const syncDb = async () => {
       } catch (forceError) {
         console.error('Erro crítico ao sincronizar banco:', forceError.message);
         console.error('Stack trace:', forceError.stack);
-        process.exit(1);
       }
     }
   }
 };
 
-module.exports = { sequelize, User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, syncDb };
+module.exports = { sequelize, User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, syncDb };

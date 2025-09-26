@@ -404,6 +404,20 @@ exports.aceitarResposta = async (req, res) => {
 
     // Atualizar status do chamado para em_andamento
     await chamado.update({ status: 'em_andamento' });
+    
+    // Notificar o autor da resposta que ela foi aceita
+    try {
+      await Notificacao.create({
+        usuarioId: resposta.usuarioId,
+        tipo: 'sistema',
+        titulo: 'Sua resposta foi aceita',
+        mensagem: `Sua resposta ao chamado "${chamado.titulo}" foi aceita. O chamado agora está em andamento.`,
+        referenciaTipo: 'chamado',
+        referenciaId: chamado.id,
+      });
+    } catch (e) {
+      console.warn('Aviso: falha ao criar notificação de resposta aceita:', e.message);
+    }
 
     res.json({ message: 'Resposta aceita com sucesso' });
   } catch (error) {

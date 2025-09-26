@@ -32,18 +32,44 @@ exports.criar = async (req, res) => {
 
     // Processar uploads (currículo opcional, documentos frente/verso obrigatórios)
     const files = req.files || {};
-    const curriculoPath = Array.isArray(files.curriculo) && files.curriculo[0] ? files.curriculo[0].filename : null;
-    const documentoFrente = Array.isArray(files.documentoFrente) && files.documentoFrente[0] ? files.documentoFrente[0].filename : null;
-    const documentoVerso = Array.isArray(files.documentoVerso) && files.documentoVerso[0] ? files.documentoVerso[0].filename : null;
+    const curriculoFile = Array.isArray(files.curriculo) && files.curriculo[0] ? files.curriculo[0] : null;
+    const docFrenteFile = Array.isArray(files.documentoFrente) && files.documentoFrente[0] ? files.documentoFrente[0] : null;
+    const docVersoFile = Array.isArray(files.documentoVerso) && files.documentoVerso[0] ? files.documentoVerso[0] : null;
 
-    if (!documentoFrente || !documentoVerso) {
+    if (!docFrenteFile || !docVersoFile) {
       return res.status(400).json({ error: 'Documento de identificação frente e verso são obrigatórios.' });
     }
 
-    if (curriculoPath) {
-      // Atualizar o currículo do usuário
+    // Upload para Cloudinary (se configurado), senão manter filename local
+    const cloudinary = require('../config/cloudinary');
+    const path = require('path');
+    const fs = require('fs');
+
+    const uploadLocalOrCloud = async (fileObj, folder) => {
+      if (!fileObj) return null;
+      // caminho completo gerado pelo multer diskStorage
+      const fullPath = fileObj.path || path.join(__dirname, '../../uploads', fileObj.filename);
+      if (cloudinary) {
+        const result = await cloudinary.uploader.upload(fullPath, {
+          folder: `nevu/${folder}`,
+          resource_type: 'auto'
+        });
+        // limpar arquivo local após upload bem-sucedido
+        try { fs.unlinkSync(fullPath); } catch (e) {}
+        return result.secure_url;
+      }
+      // Fallback: usar filename local (servirá em dev; em produção pode expirar após restart)
+      return fileObj.filename;
+    };
+
+    const curriculoValue = await uploadLocalOrCloud(curriculoFile, 'curriculos');
+    const documentoFrente = await uploadLocalOrCloud(docFrenteFile, 'documentos/frente');
+    const documentoVerso = await uploadLocalOrCloud(docVersoFile, 'documentos/verso');
+
+    if (curriculoValue) {
+      // Atualizar o currículo do usuário (armazenar URL quando cloudinary estiver ativo)
       await User.update(
-        { curriculo: curriculoPath },
+        { curriculo: curriculoValue },
         { where: { id: usuarioId } }
       );
     }

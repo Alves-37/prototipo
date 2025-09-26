@@ -36,6 +36,7 @@ const User = sequelize.define('User', {
   resumo: DataTypes.TEXT, // Campo adicionado
   habilidades: DataTypes.TEXT, // pode ser JSON string
   curriculo: DataTypes.STRING, // path do arquivo
+  cvData: DataTypes.TEXT, // dados do arquivo CV em base64
   dataNascimento: DataTypes.DATE,
   foto: DataTypes.TEXT, // Mudado para TEXT para suportar base64
   

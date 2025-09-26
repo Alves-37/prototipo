@@ -84,6 +84,7 @@ const filtrarCamposUsuario = (user) => {
         resumo: userData.resumo,
         habilidades: userData.habilidades ? JSON.parse(userData.habilidades) : [],
         curriculo: userData.curriculo,
+        cvData: userData.cvData,
         dataNascimento: userData.dataNascimento,
         foto: userData.foto,
         linkedin: userData.linkedin,
@@ -163,6 +164,7 @@ exports.atualizar = async (req, res) => {
       dadosAtualizacao.instituicao = perfil.instituicao;
       dadosAtualizacao.resumo = perfil.resumo;
       dadosAtualizacao.curriculo = perfil.cv; // Mapear cv para curriculo
+      dadosAtualizacao.cvData = perfil.cvData; // Dados do CV em base64
       dadosAtualizacao.dataNascimento = perfil.dataNascimento;
       dadosAtualizacao.foto = perfil.foto;
       

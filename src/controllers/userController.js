@@ -292,10 +292,154 @@ exports.listar = async (req, res) => {
     const users = await User.findAll({
       attributes: { exclude: ['senha'] }
     });
-    
-    res.json(users.map(user => filtrarCamposUsuario(user)));
+    return res.json(users.map(u => filtrarCamposUsuario(u)));
   } catch (error) {
     console.error('Erro ao listar usuários:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
-}; 
+};
+
+// =============================
+// Certificações do usuário
+// =============================
+exports.getCertificacoes = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findByPk(id);
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+    const certificacoes = user.certificacoes ? JSON.parse(user.certificacoes) : [];
+    return res.json(certificacoes);
+  } catch (error) {
+    console.error('Erro ao obter certificações:', error);
+    return res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+};
+
+exports.addCertificacao = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (req.user.id !== parseInt(id)) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+    const user = await User.findByPk(id);
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+    const atual = user.certificacoes ? JSON.parse(user.certificacoes) : [];
+    const nova = {
+      id: Date.now(),
+      nome: req.body.nome,
+      instituicao: req.body.instituicao,
+      data: req.body.data || null,
+      link: req.body.link || null,
+      arquivo: req.body.arquivo || null
+    };
+    atual.push(nova);
+    await user.update({ certificacoes: JSON.stringify(atual) });
+    return res.status(201).json(nova);
+  } catch (error) {
+    console.error('Erro ao adicionar certificação:', error);
+    return res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+};
+
+exports.deleteCertificacao = async (req, res) => {
+  try {
+    const { id, certId } = req.params;
+    if (req.user.id !== parseInt(id)) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+    const user = await User.findByPk(id);
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+    const atual = user.certificacoes ? JSON.parse(user.certificacoes) : [];
+    const filtrado = atual.filter(c => String(c.id) !== String(certId));
+    await user.update({ certificacoes: JSON.stringify(filtrado) });
+    return res.json({ message: 'Certificação removida com sucesso' });
+  } catch (error) {
+    console.error('Erro ao remover certificação:', error);
+    return res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+};
+
+// =============================
+// Projetos do usuário
+// =============================
+exports.getProjetos = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findByPk(id);
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+    const projetos = user.projetos ? JSON.parse(user.projetos) : [];
+    return res.json(projetos);
+  } catch (error) {
+    console.error('Erro ao obter projetos:', error);
+    return res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+};
+
+exports.addProjeto = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (req.user.id !== parseInt(id)) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+    const user = await User.findByPk(id);
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+
+    const atual = user.projetos ? JSON.parse(user.projetos) : [];
+    const novo = {
+      id: Date.now(),
+      nome: req.body.nome,
+      descricao: req.body.descricao,
+      tecnologias: Array.isArray(req.body.tecnologias) ? req.body.tecnologias : [],
+      link: req.body.link || null,
+      imagem: req.body.imagem || null
+    };
+    atual.push(novo);
+    await user.update({ projetos: JSON.stringify(atual) });
+    return res.status(201).json(novo);
+  } catch (error) {
+    console.error('Erro ao adicionar projeto:', error);
+    return res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+};
+
+exports.deleteProjeto = async (req, res) => {
+  try {
+    const { id, projetoId } = req.params;
+    if (req.user.id !== parseInt(id)) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+    const user = await User.findByPk(id);
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+    const atual = user.projetos ? JSON.parse(user.projetos) : [];
+    const filtrado = atual.filter(p => String(p.id) !== String(projetoId));
+    await user.update({ projetos: JSON.stringify(filtrado) });
+    return res.json({ message: 'Projeto removido com sucesso' });
+  } catch (error) {
+    console.error('Erro ao remover projeto:', error);
+    return res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+};
+
+// =============================
+// Estatísticas do usuário
+// =============================
+exports.getEstatisticas = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findByPk(id);
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+
+    // Placeholder: substituir por contagens reais quando disponível
+    const stats = {
+      candidaturas: { total: 0, esteMes: 0, aprovadas: 0 },
+      entrevistas: { total: 0, agendadas: 0, realizadas: 0 },
+      vagasSalvas: 0,
+      visualizacoes: 0
+    };
+
+    return res.json(stats);
+  } catch (error) {
+    console.error('Erro ao obter estatísticas:', error);
+    return res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+};

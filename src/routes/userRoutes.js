@@ -11,4 +11,17 @@ router.get('/:id', userController.buscarPorId);
 router.put('/:id', userController.atualizar);
 router.delete('/:id', userController.excluir);
 
-module.exports = router; 
+// Certificações
+router.get('/:id/certificacoes', userController.getCertificacoes);
+router.post('/:id/certificacoes', userController.addCertificacao);
+router.delete('/:id/certificacoes/:certId', userController.deleteCertificacao);
+
+// Projetos
+router.get('/:id/projetos', userController.getProjetos);
+router.post('/:id/projetos', userController.addProjeto);
+router.delete('/:id/projetos/:projetoId', userController.deleteProjeto);
+
+// Estatísticas
+router.get('/:id/estatisticas', userController.getEstatisticas);
+
+module.exports = router;

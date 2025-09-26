@@ -59,23 +59,19 @@ const filtrarCamposUsuario = (user) => {
         curriculo: userData.curriculo,
         dataNascimento: userData.dataNascimento,
         foto: userData.foto,
-        // Redes sociais
         linkedin: userData.linkedin,
         github: userData.github,
         portfolio: userData.portfolio,
         behance: userData.behance,
         instagram: userData.instagram,
         twitter: userData.twitter,
-        // Preferências de trabalho
         tipoTrabalho: userData.tipoTrabalho,
         faixaSalarial: userData.faixaSalarial,
         localizacaoPreferida: userData.localizacaoPreferida,
         disponibilidade: userData.disponibilidade,
-        // Configurações de privacidade
         perfilPublico: userData.perfilPublico,
         mostrarTelefone: userData.mostrarTelefone,
         mostrarEndereco: userData.mostrarEndereco,
-        // Configurações de notificações
         alertasVagas: userData.alertasVagas,
         frequenciaAlertas: userData.frequenciaAlertas,
         vagasInteresse: userData.vagasInteresse
@@ -112,28 +108,36 @@ exports.login = async (req, res) => {
     if (!email || !senha) {
       return res.status(400).json({ error: 'Preencha email e senha.' });
     }
-    
-    // Procurar usuário apenas pelo email (sem especificar tipo)
     const user = await User.findOne({ where: { email } });
     if (!user) {
       return res.status(404).json({ error: 'Usuário não encontrado.' });
     }
-    
-    // Verificar senha
     const ok = await bcrypt.compare(senha, user.senha);
     if (!ok) {
       return res.status(401).json({ error: 'Senha incorreta.' });
     }
-    
-    // Gerar token
     const token = jwt.sign({ id: user.id, email: user.email, tipo: user.tipo }, JWT_SECRET, { expiresIn: '7d' });
-    
-    // Retornar dados filtrados por tipo
     const userData = filtrarCamposUsuario(user);
-    
     return res.json({ token, user: userData });
   } catch (err) {
     console.error('Erro no login:', err);
     return res.status(500).json({ error: 'Erro interno do servidor.' });
   }
-}; 
+};
+
+// Google OAuth callback
+exports.googleCallback = async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.redirect((process.env.FRONTEND_URL || 'http://localhost:5173') + '/login?error=google');
+    }
+    const token = jwt.sign({ id: user.id, email: user.email, tipo: user.tipo }, JWT_SECRET, { expiresIn: '7d' });
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    return res.redirect(`${frontendUrl}/auth/callback#token=${encodeURIComponent(token)}`);
+  } catch (err) {
+    console.error('Erro no callback do Google:', err);
+    return res.redirect((process.env.FRONTEND_URL || 'http://localhost:5173') + '/login?error=google');
+  }
+};
+ 

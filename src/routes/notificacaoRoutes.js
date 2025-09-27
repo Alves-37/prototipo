@@ -18,4 +18,7 @@ router.put('/lidas', notificacaoController.marcarTodasComoLidas);
 // DELETE /api/notificacoes
 router.delete('/', notificacaoController.limpar);
 
+// DELETE /api/notificacoes/:id
+router.delete('/:id', notificacaoController.remover);
+
 module.exports = router;

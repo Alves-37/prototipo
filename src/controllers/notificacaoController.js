@@ -84,3 +84,20 @@ exports.limpar = async (req, res) => {
     res.status(500).json({ error: 'Erro ao limpar notificações' });
   }
 };
+
+// Remover uma notificação específica
+exports.remover = async (req, res) => {
+  try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: 'Não autenticado' });
+    }
+    const { id } = req.params;
+    const notif = await Notificacao.findOne({ where: { id, usuarioId: req.user.id } });
+    if (!notif) return res.status(404).json({ error: 'Notificação não encontrada' });
+    await notif.destroy();
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Erro ao remover notificação:', err);
+    res.status(500).json({ error: 'Erro ao remover notificação' });
+  }
+};

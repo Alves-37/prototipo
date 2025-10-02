@@ -1,15 +1,24 @@
 const sequelize = require('../config/database');
-const User = require('./User');
-const Vaga = require('./Vaga');
-const Candidatura = require('./Candidatura');
-const Chamado = require('./Chamado');
-const RespostaChamado = require('./RespostaChamado');
-const Mensagem = require('./Mensagem');
-const Conversa = require('./Conversa');
-const Notificacao = require('./Notificacao');
-const Denuncia = require('./Denuncia');
-const Admin = require('./Admin');
-const Apoio = require('./Apoio');
+
+// Carrega e registra models (efeito colateral do require define no sequelize)
+require('./User');
+require('./Vaga');
+require('./Candidatura');
+require('./Chamado');
+require('./RespostaChamado');
+require('./Mensagem');
+require('./Conversa');
+require('./Notificacao');
+require('./Denuncia');
+require('./Admin');
+require('./Apoio');
+
+// Recupera instâncias a partir do registry do Sequelize
+const { User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio } = sequelize.models;
+
+if (!User || !Vaga) {
+  console.error('[Models] Registry incompleto. Disponíveis:', Object.keys(sequelize.models || {}));
+}
 
 // Associação: Uma empresa (User) tem muitas Vagas
 User.hasMany(Vaga, { foreignKey: 'empresaId', as: 'vagas' });

@@ -7,9 +7,9 @@ module.exports = function requireAdmin(req, res, next) {
     if (!token) {
       return res.status(401).json({ error: 'Token não fornecido' });
     }
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      return res.status(500).json({ error: 'JWT_SECRET não configurado' });
+    const secret = process.env.JWT_SECRET || 'umsegredoseguro';
+    if (!process.env.JWT_SECRET) {
+      console.warn('[requireAdmin] JWT_SECRET não definido. Usando fallback (apenas dev). Configure JWT_SECRET no ambiente.');
     }
     const payload = jwt.verify(token, secret);
     if (!payload || payload.role !== 'admin') {

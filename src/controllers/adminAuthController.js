@@ -3,7 +3,10 @@ const jwt = require('jsonwebtoken');
 const { Admin } = require('../models');
 
 // Usa o mesmo segredo já existente no projeto para não divergir
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || 'umsegredoseguro';
+if (!process.env.JWT_SECRET) {
+  console.warn('[adminAuth] JWT_SECRET não definido no ambiente. Usando fallback padrão (apenas para desenvolvimento).');
+}
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1d';
 
 function signAdminToken(admin) {

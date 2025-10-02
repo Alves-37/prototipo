@@ -1,4 +1,4 @@
-const { User } = require('../models');
+const { User, Notificacao } = require('../models');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
@@ -95,6 +95,32 @@ exports.register = async (req, res) => {
     }
     const hash = await bcrypt.hash(senha, 10);
     const user = await User.create({ nome, email, senha: hash, tipo });
+
+    // Criar notificações de boas-vindas (não bloquear fluxo em caso de erro)
+    try {
+      const now = new Date();
+      await Notificacao.bulkCreate([
+        {
+          usuarioId: user.id,
+          titulo: 'Bem-vindo(a) à Nevú! 🎉',
+          mensagem: 'Sua jornada começa agora. Explore vagas, atualize seu perfil e aproveite os recursos da plataforma.',
+          lida: false,
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          usuarioId: user.id,
+          titulo: 'Conta Nevú criada com sucesso ✅',
+          mensagem: 'Sua conta foi criada com sucesso. Você pode gerenciar suas informações no seu perfil.',
+          lida: false,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ]);
+    } catch (e) {
+      console.warn('Falha ao criar notificações de boas-vindas:', e?.message);
+    }
+
     const userData = filtrarCamposUsuario(user);
     return res.status(201).json(userData);
   } catch (err) {

@@ -8,6 +8,8 @@ const Mensagem = require('./Mensagem');
 const Conversa = require('./Conversa');
 const Notificacao = require('./Notificacao');
 const Denuncia = require('./Denuncia');
+const Admin = require('./Admin');
+const Apoio = require('./Apoio');
 
 // Associação: Uma empresa (User) tem muitas Vagas
 User.hasMany(Vaga, { foreignKey: 'empresaId', as: 'vagas' });
@@ -50,6 +52,14 @@ Mensagem.belongsTo(Conversa, { foreignKey: 'conversaId', targetKey: 'conversaId'
 User.hasMany(Notificacao, { foreignKey: 'usuarioId', as: 'notificacoes' });
 Notificacao.belongsTo(User, { foreignKey: 'usuarioId', as: 'usuario' });
 
+// Associações de denúncias (autor -> users.id)
+User.hasMany(Denuncia, { foreignKey: 'autorId', as: 'denuncias' });
+Denuncia.belongsTo(User, { foreignKey: 'autorId', as: 'autor' });
+
+// Associações de apoio (opcionalmente vinculadas a um usuário)
+User.hasMany(Apoio, { foreignKey: 'usuarioId', as: 'apoios' });
+Apoio.belongsTo(User, { foreignKey: 'usuarioId', as: 'usuario' });
+
 const syncDb = async () => {
   try {
     if (process.env.NODE_ENV === 'production') {
@@ -79,11 +89,9 @@ const syncDb = async () => {
         await sequelize.sync({ force: true });
         console.log('Banco de dados resetado com sucesso!');
       } catch (forceError) {
-        console.error('Erro crítico ao sincronizar banco:', forceError.message);
-        console.error('Stack trace:', forceError.stack);
       }
     }
   }
 };
 
-module.exports = { sequelize, User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, syncDb };
+module.exports = { sequelize, User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, syncDb };

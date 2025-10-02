@@ -15,6 +15,9 @@ const mensagemRoutes = require('./routes/mensagens');
 const notificacaoRoutes = require('./routes/notificacaoRoutes');
 const denunciaRoutes = require('./routes/denunciaRoutes');
 const passport = require('passport');
+const adminAuthRoutes = require('./routes/adminAuthRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const apoioPublicRoutes = require('./routes/apoioPublicRoutes');
 
 // Configurar Passport (Google OAuth)
 try {
@@ -46,6 +49,9 @@ app.use('/api/chamados', chamadoRoutes);
 app.use('/api/mensagens', mensagemRoutes);
 app.use('/api/notificacoes', notificacaoRoutes);
 app.use('/api/denuncias', denunciaRoutes);
+app.use('/api/admin/auth', adminAuthRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/apoio', apoioPublicRoutes);
 
 // Middleware de tratamento de erros
 app.use((err, req, res, next) => {

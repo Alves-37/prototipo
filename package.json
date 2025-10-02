@@ -15,7 +15,9 @@
     "migrate-fases": "node migrate-fases.js",
     "migrate-capacidade": "node migrate-capacidade.js",
     "check-capacidade": "node check-capacidade.js",
-    "migrate-mensagens": "node migrate-mensagens.js"
+    "migrate-mensagens": "node migrate-mensagens.js",
+    "db:list": "node scripts/list-tables.js",
+    "seed:admin": "node scripts/seed-admin.js"
   },
   "keywords": [],
   "author": "",

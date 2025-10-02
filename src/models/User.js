@@ -92,7 +92,6 @@ const User = sequelize.define('User', {
   idiomas: DataTypes.TEXT, // JSON string
   certificacoes: DataTypes.TEXT, // JSON string
   projetos: DataTypes.TEXT, // JSON string
-  
   // Campos para empresa
   plano: {
     type: DataTypes.ENUM('gratuito', 'basico', 'premium', 'empresarial'),
@@ -118,11 +117,27 @@ const User = sequelize.define('User', {
   capitalSocial: DataTypes.DECIMAL(15, 2),
   moedaCapital: DataTypes.STRING,
   
+  // Suspensão/eliminação programada
+  suspended: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  suspendedUntil: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  deletionRequestedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  supportContacted: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  
 }, {
   tableName: 'users',
   timestamps: true,
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
 });
-
-module.exports = User; 

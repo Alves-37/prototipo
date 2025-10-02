@@ -1,4 +1,4 @@
-const { User } = require('../models');
+const { User, Notificacao } = require('../models');
 
 // Util: normaliza valores vindos do frontend
 // - Converte string vazia ('') para null
@@ -260,7 +260,7 @@ exports.atualizar = async (req, res) => {
   }
 };
 
-// Excluir usuário
+// Solicitar exclusão: suspende a conta por 30 dias e agenda exclusão
 exports.excluir = async (req, res) => {
   try {
     const { id } = req.params;
@@ -276,13 +276,80 @@ exports.excluir = async (req, res) => {
       return res.status(403).json({ error: 'Acesso negado' });
     }
     
-    // Excluir usuário
-    await user.destroy();
-    
-    res.json({ message: 'Usuário excluído com sucesso' });
+    // Calcular 30 dias à frente
+    const now = new Date();
+    const suspendedUntil = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    // Marcar suspensão e data de pedido
+    await user.update({
+      suspended: true,
+      suspendedUntil,
+      deletionRequestedAt: now,
+    });
+
+    // Enviar notificações (não bloquear fluxo em caso de erro)
+    try {
+      await Notificacao.bulkCreate([
+        {
+          usuarioId: user.id,
+          titulo: 'Solicitação de exclusão recebida 📴',
+          mensagem: 'Sua conta foi marcada para exclusão. Caso mude de ideia, entre em contato com o suporte em até 30 dias para reativá-la.',
+          lida: false,
+        },
+        {
+          usuarioId: user.id,
+          titulo: 'Suspensão temporária da conta',
+          mensagem: 'Durante o período de 30 dias sua conta ficará suspensa e inacessível. Após esse prazo, será removida definitivamente.',
+          lida: false,
+        },
+      ]);
+    } catch {}
+
+    return res.json({ message: 'Conta suspensa por 30 dias. Após o prazo, será excluída se não houver contato com o suporte.' });
   } catch (error) {
     console.error('Erro ao excluir usuário:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+};
+
+// Marcar que o usuário contactou o suporte (cancela exclusão automática)
+exports.marcarSuporteContactado = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (req.user.id !== parseInt(id)) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+    const user = await User.findByPk(id);
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+    await user.update({ supportContacted: true });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao marcar suporte contactado:', err);
+    return res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+};
+
+// Purga contas expiradas (admin/maintenance): remove usuários suspensos com prazo vencido e sem contato
+exports.purgarContasExpiradas = async (req, res) => {
+  try {
+    const agora = new Date();
+    const expirados = await User.findAll({
+      where: {
+        suspended: true,
+        supportContacted: false,
+      }
+    });
+    let removidos = 0;
+    for (const u of expirados) {
+      if (u.suspendedUntil && new Date(u.suspendedUntil) <= agora) {
+        await u.destroy();
+        removidos++;
+      }
+    }
+    return res.json({ ok: true, removidos });
+  } catch (err) {
+    console.error('Erro ao purgar contas expiradas:', err);
+    return res.status(500).json({ error: 'Erro ao purgar contas' });
   }
 };
 

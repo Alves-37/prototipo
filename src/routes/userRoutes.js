@@ -11,6 +11,9 @@ router.get('/:id', userController.buscarPorId);
 router.put('/:id', userController.atualizar);
 router.delete('/:id', userController.excluir);
 
+// Marcar que o usuário contactou o suporte (cancela exclusão automática)
+router.post('/:id/support-contacted', userController.marcarSuporteContactado);
+
 // Certificações
 router.get('/:id/certificacoes', userController.getCertificacoes);
 router.post('/:id/certificacoes', userController.addCertificacao);

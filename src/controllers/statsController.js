@@ -4,17 +4,17 @@ const { Op } = require('sequelize');
 // Obter estatísticas da plataforma
 exports.getStats = async (req, res) => {
   try {
-    // Contar vagas ativas
+    // Contar vagas ativas (status = 'publicada')
     const vagas = await Vaga.count({
       where: {
-        status: 'ativa'
+        status: 'publicada'
       }
     });
 
     // Contar empresas únicas com vagas ativas
     const empresas = await Vaga.count({
       where: {
-        status: 'ativa'
+        status: 'publicada'
       },
       distinct: true,
       col: 'empresaId'

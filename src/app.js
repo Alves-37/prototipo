@@ -14,7 +14,6 @@ const chamadoRoutes = require('./routes/chamadoRoutes');
 const mensagemRoutes = require('./routes/mensagens');
 const notificacaoRoutes = require('./routes/notificacaoRoutes');
 const denunciaRoutes = require('./routes/denunciaRoutes');
-const pushRoutes = require('./routes/pushRoutes');
 const statsRoutes = require('./routes/statsRoutes');
 const passport = require('passport');
 const adminAuthRoutes = require('./routes/adminAuthRoutes');
@@ -31,16 +30,7 @@ try {
 const app = express();
 
 // Middleware
-app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'https://nevu.vercel.app'
-  ],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use(cors());
 app.use(express.json({ limit: '200mb' }));
 app.use(express.urlencoded({ extended: true, limit: '200mb' }));
 app.use(passport.initialize());
@@ -60,7 +50,6 @@ app.use('/api/chamados', chamadoRoutes);
 app.use('/api/mensagens', mensagemRoutes);
 app.use('/api/notificacoes', notificacaoRoutes);
 app.use('/api/denuncias', denunciaRoutes);
-app.use('/api/push', pushRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/admin/auth', adminAuthRoutes);
 app.use('/api/admin', adminRoutes);

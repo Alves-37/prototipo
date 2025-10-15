@@ -1,4 +1,4 @@
-const { Vaga, Usuario, Chamado } = require('../models');
+const { Vaga, User, Chamado } = require('../models');
 const { Op } = require('sequelize');
 
 // Obter estatísticas da plataforma
@@ -20,10 +20,10 @@ exports.getStats = async (req, res) => {
       col: 'empresaId'
     });
 
-    // Contar candidatos (usuários com tipo 'candidato')
-    const candidatos = await Usuario.count({
+    // Contar candidatos (usuários com tipo 'usuario')
+    const candidatos = await User.count({
       where: {
-        tipo: 'candidato'
+        tipo: 'usuario'
       }
     });
 

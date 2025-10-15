@@ -227,21 +227,6 @@ exports.criar = async (req, res) => {
       if (notifs.length > 0) {
         await Notificacao.bulkCreate(notifs, { validate: true });
       }
-
-      // Enviar notificações push para todos os usuários
-      const pushController = require('./pushController');
-      const pushPayload = {
-        title: '📋 Novo Chamado Publicado!',
-        body: `${autorNome} publicou: ${chamadoTitulo}`,
-        icon: '/nevu.png',
-        url: `/chamado/${chamadoCompleto.id}`,
-        tag: `chamado-${chamadoCompleto.id}`
-      };
-      
-      // Enviar para todos exceto o autor (não bloquear o fluxo)
-      pushController.sendToAll(pushPayload, req.user.id).catch(err => {
-        console.warn('Erro ao enviar push notifications:', err);
-      });
     } catch (e) {
       console.warn('Aviso: falha ao criar notificações de novo chamado:', e.message);
     }

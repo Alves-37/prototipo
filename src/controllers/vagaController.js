@@ -225,21 +225,6 @@ exports.criar = async (req, res) => {
       if (notifs.length > 0) {
         await Notificacao.bulkCreate(notifs, { validate: true });
       }
-
-      // Enviar notificações push para todos os candidatos
-      const pushController = require('./pushController');
-      const pushPayload = {
-        title: '💼 Nova Vaga Disponível!',
-        body: `${empresaNome} publicou: ${vagaTitulo}`,
-        icon: '/nevu.png',
-        url: `/vaga/${vagaCompleta.id}`,
-        tag: `vaga-${vagaCompleta.id}`
-      };
-      
-      // Enviar para todos os usuários (não bloquear o fluxo)
-      pushController.sendToAll(pushPayload, empresaId).catch(err => {
-        console.warn('Erro ao enviar push notifications:', err);
-      });
     } catch (e) {
       console.warn('Aviso: falha ao criar notificações de nova vaga:', e.message);
     }

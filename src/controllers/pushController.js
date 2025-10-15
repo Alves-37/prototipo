@@ -3,18 +3,38 @@ const webpush = require('web-push');
 
 // Configurar VAPID keys (você precisará gerar essas chaves)
 // Execute: npx web-push generate-vapid-keys
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDJo3QTnpC_2MYqXhVeY6VkJJQXJJQXJJQXJJQXJJQXI';
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'your-private-key-here';
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:suporte@nevu.co.mz';
 
-webpush.setVapidDetails(
-  VAPID_SUBJECT,
-  VAPID_PUBLIC_KEY,
-  VAPID_PRIVATE_KEY
-);
+// Verificar se as chaves VAPID estão configuradas
+let pushNotificationsEnabled = false;
+
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  try {
+    webpush.setVapidDetails(
+      VAPID_SUBJECT,
+      VAPID_PUBLIC_KEY,
+      VAPID_PRIVATE_KEY
+    );
+    pushNotificationsEnabled = true;
+    console.log('✅ Push notifications configuradas com sucesso');
+  } catch (error) {
+    console.error('❌ Erro ao configurar VAPID keys:', error.message);
+    console.error('Push notifications desabilitadas. Configure VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY nas variáveis de ambiente.');
+  }
+} else {
+  console.warn('⚠️  VAPID keys não configuradas. Push notifications desabilitadas.');
+  console.warn('Para habilitar, configure VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY nas variáveis de ambiente.');
+  console.warn('Gere as chaves com: npx web-push generate-vapid-keys');
+}
 
 // Inscrever usuário para notificações push
 exports.subscribe = async (req, res) => {
+  if (!pushNotificationsEnabled) {
+    return res.status(503).json({ error: 'Push notifications não estão disponíveis no momento' });
+  }
+
   try {
     const { subscription } = req.body;
     const usuarioId = req.user.id;
@@ -87,6 +107,11 @@ exports.unsubscribe = async (req, res) => {
 
 // Enviar notificação push para um usuário específico
 exports.sendToUser = async (usuarioId, payload) => {
+  if (!pushNotificationsEnabled) {
+    console.log('Push notifications desabilitadas, notificação não enviada');
+    return { sent: 0, failed: 0, disabled: true };
+  }
+
   try {
     const subscriptions = await PushSubscription.findAll({
       where: {
@@ -139,6 +164,11 @@ exports.sendToUser = async (usuarioId, payload) => {
 
 // Enviar notificação para todos os usuários
 exports.sendToAll = async (payload, excludeUserId = null) => {
+  if (!pushNotificationsEnabled) {
+    console.log('Push notifications desabilitadas, notificação não enviada');
+    return { sent: 0, failed: 0, total: 0, disabled: true };
+  }
+
   try {
     const where = { active: true };
     if (excludeUserId) {
@@ -182,5 +212,8 @@ exports.sendToAll = async (payload, excludeUserId = null) => {
 
 // Obter chave pública VAPID
 exports.getPublicKey = (req, res) => {
+  if (!pushNotificationsEnabled) {
+    return res.status(503).json({ error: 'Push notifications não estão disponíveis no momento' });
+  }
   res.json({ publicKey: VAPID_PUBLIC_KEY });
 };

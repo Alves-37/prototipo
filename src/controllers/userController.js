@@ -260,10 +260,11 @@ exports.atualizar = async (req, res) => {
   }
 };
 
-// Solicitar exclusão: suspende a conta por 30 dias e agenda exclusão
+// Solicitar exclusão: pode ser imediata ou agendada para 30 dias
 exports.excluir = async (req, res) => {
   try {
     const { id } = req.params;
+    const { immediate } = req.query; // Parâmetro para exclusão imediata
     
     // Verificar se o usuário existe
     const user = await User.findByPk(id);
@@ -276,7 +277,21 @@ exports.excluir = async (req, res) => {
       return res.status(403).json({ error: 'Acesso negado' });
     }
     
-    // Calcular 30 dias à frente
+    // Se for exclusão imediata (confirmada pelo usuário)
+    if (immediate === 'true') {
+      // Excluir todas as candidaturas do usuário
+      await Candidatura.destroy({ where: { usuarioId: id } });
+      
+      // Excluir todas as notificações do usuário
+      await Notificacao.destroy({ where: { usuarioId: id } });
+      
+      // Excluir o usuário permanentemente
+      await user.destroy();
+      
+      return res.json({ message: 'Conta excluída com sucesso', deleted: true });
+    }
+    
+    // Caso contrário, suspender por 30 dias
     const now = new Date();
     const suspendedUntil = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 

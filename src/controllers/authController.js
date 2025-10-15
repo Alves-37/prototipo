@@ -138,6 +138,24 @@ exports.login = async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: 'Usuário não encontrado.' });
     }
+    
+    // Verificar se a conta está suspensa (aguardando exclusão)
+    if (user.suspended) {
+      const now = new Date();
+      const suspendedUntil = user.suspendedUntil ? new Date(user.suspendedUntil) : null;
+      
+      // Se ainda está dentro do período de suspensão
+      if (suspendedUntil && suspendedUntil > now) {
+        const diasRestantes = Math.ceil((suspendedUntil - now) / (1000 * 60 * 60 * 24));
+        return res.status(403).json({ 
+          error: 'Conta suspensa',
+          message: `Sua conta está suspensa e será excluída em ${diasRestantes} dia(s). Entre em contato com o suporte para cancelar a exclusão.`,
+          suspended: true,
+          diasRestantes
+        });
+      }
+    }
+    
     const ok = await bcrypt.compare(senha, user.senha);
     if (!ok) {
       return res.status(401).json({ error: 'Senha incorreta.' });

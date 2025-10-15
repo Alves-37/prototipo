@@ -12,9 +12,10 @@ require('./Notificacao');
 require('./Denuncia');
 require('./Admin');
 require('./Apoio');
+require('./PushSubscription');
 
 // Recupera instâncias a partir do registry do Sequelize
-const { User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio } = sequelize.models;
+const { User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription } = sequelize.models;
 
 if (!User || !Vaga) {
   console.error('[Models] Registry incompleto. Disponíveis:', Object.keys(sequelize.models || {}));
@@ -69,6 +70,10 @@ Denuncia.belongsTo(User, { foreignKey: 'autorId', as: 'autor' });
 User.hasMany(Apoio, { foreignKey: 'usuarioId', as: 'apoios' });
 Apoio.belongsTo(User, { foreignKey: 'usuarioId', as: 'usuario' });
 
+// Associações de push subscriptions
+User.hasMany(PushSubscription, { foreignKey: 'usuarioId', as: 'pushSubscriptions' });
+PushSubscription.belongsTo(User, { foreignKey: 'usuarioId', as: 'usuario' });
+
 const syncDb = async () => {
   try {
     if (process.env.NODE_ENV === 'production') {
@@ -103,4 +108,4 @@ const syncDb = async () => {
   }
 };
 
-module.exports = { sequelize, User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, syncDb };
+module.exports = { sequelize, User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, syncDb };

@@ -269,7 +269,7 @@ exports.atualizar = async (req, res) => {
   }
 };
 
-// Excluir chamado
+// Excluir chamado (permitido mesmo com respostas)
 exports.excluir = async (req, res) => {
   try {
     const { id } = req.params;
@@ -282,18 +282,11 @@ exports.excluir = async (req, res) => {
       return res.status(404).json({ error: 'Chamado não encontrado ou sem permissão' });
     }
 
-    // Verificar se tem respostas
-    const temRespostas = await RespostaChamado.count({
-      where: { chamadoId: id }
+    // Apagar respostas relacionadas e depois o chamado em uma transação
+    await Chamado.sequelize.transaction(async (t) => {
+      await RespostaChamado.destroy({ where: { chamadoId: id }, transaction: t });
+      await chamado.destroy({ transaction: t });
     });
-
-    if (temRespostas > 0) {
-      return res.status(400).json({ 
-        error: 'Não é possível excluir um chamado que possui respostas' 
-      });
-    }
-
-    await chamado.destroy();
 
     res.json({ message: 'Chamado excluído com sucesso' });
   } catch (error) {

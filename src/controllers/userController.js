@@ -145,78 +145,100 @@ exports.atualizar = async (req, res) => {
       return res.status(403).json({ error: 'Acesso negado' });
     }
     
-    // Preparar dados para atualização
-    const dadosAtualizacao = {
-      nome: updateData.nome,
-      email: updateData.email
+    // Preparar dados para atualização (somente campos enviados)
+    const dadosAtualizacao = {};
+    const setIfProvided = (key, val) => {
+      if (val !== undefined) {
+        const normalized = toNullable(val);
+        dadosAtualizacao[key] = normalized;
+      }
     };
+    setIfProvided('nome', updateData.nome);
+    setIfProvided('email', updateData.email);
     
     // Se for candidato, incluir campos do perfil
     if (user.tipo === 'usuario') {
       const perfil = updateData.perfil || {};
       
-      // Campos básicos
-      dadosAtualizacao.telefone = perfil.telefone;
-      dadosAtualizacao.endereco = perfil.endereco;
-      dadosAtualizacao.bio = perfil.bio;
-      dadosAtualizacao.experiencia = perfil.experiencia;
-      dadosAtualizacao.formacao = perfil.formacao;
-      dadosAtualizacao.instituicao = perfil.instituicao;
-      dadosAtualizacao.resumo = perfil.resumo;
-      dadosAtualizacao.curriculo = perfil.cv; // Mapear cv para curriculo
-      dadosAtualizacao.cvData = perfil.cvData; // Dados do CV em base64
-      dadosAtualizacao.dataNascimento = perfil.dataNascimento;
-      dadosAtualizacao.foto = perfil.foto;
+      // Campos básicos (normalizados)
+      setIfProvided('telefone', perfil.telefone);
+      setIfProvided('endereco', perfil.endereco);
+      setIfProvided('bio', perfil.bio);
+      setIfProvided('experiencia', perfil.experiencia);
+      setIfProvided('formacao', perfil.formacao);
+      setIfProvided('instituicao', perfil.instituicao);
+      setIfProvided('resumo', perfil.resumo);
+      if (perfil.cv !== undefined) setIfProvided('curriculo', perfil.cv); // Mapear cv -> curriculo
+      setIfProvided('cvData', perfil.cvData);
+      if (perfil.dataNascimento !== undefined) {
+        const n = toNullable(perfil.dataNascimento);
+        if (n === null) {
+          dadosAtualizacao.dataNascimento = null;
+        } else {
+          const d = new Date(n);
+          dadosAtualizacao.dataNascimento = isNaN(d.getTime()) ? null : d;
+        }
+      }
+      setIfProvided('foto', perfil.foto);
       
       // Redes sociais
-      dadosAtualizacao.linkedin = perfil.linkedin;
-      dadosAtualizacao.github = perfil.github;
-      dadosAtualizacao.portfolio = perfil.portfolio;
-      dadosAtualizacao.behance = perfil.behance;
-      dadosAtualizacao.instagram = perfil.instagram;
-      dadosAtualizacao.twitter = perfil.twitter;
+      setIfProvided('linkedin', perfil.linkedin);
+      setIfProvided('github', perfil.github);
+      setIfProvided('portfolio', perfil.portfolio);
+      setIfProvided('behance', perfil.behance);
+      setIfProvided('instagram', perfil.instagram);
+      setIfProvided('twitter', perfil.twitter);
       
-      // Preferências
-      dadosAtualizacao.tipoTrabalho = perfil.tipoTrabalho;
-      dadosAtualizacao.faixaSalarial = perfil.faixaSalarial;
-      dadosAtualizacao.localizacaoPreferida = perfil.localizacaoPreferida;
-      dadosAtualizacao.disponibilidade = perfil.disponibilidade;
+      // Preferências (validar enums quando enviados)
+      if (perfil.tipoTrabalho !== undefined) {
+        const allowed = ['remoto', 'presencial', 'hibrido'];
+        dadosAtualizacao.tipoTrabalho = allowed.includes(perfil.tipoTrabalho) ? perfil.tipoTrabalho : null;
+      }
+      if (perfil.faixaSalarial !== undefined) {
+        const allowed = ['5000-10000','10000-15000','15000-25000','25000-35000','35000-50000','50000+'];
+        dadosAtualizacao.faixaSalarial = allowed.includes(perfil.faixaSalarial) ? perfil.faixaSalarial : null;
+      }
+      setIfProvided('localizacaoPreferida', perfil.localizacaoPreferida);
+      if (perfil.disponibilidade !== undefined) {
+        const allowed = ['imediata','15dias','30dias','60dias'];
+        dadosAtualizacao.disponibilidade = allowed.includes(perfil.disponibilidade) ? perfil.disponibilidade : null;
+      }
       
       // Privacidade
-      dadosAtualizacao.perfilPublico = perfil.perfilPublico;
-      dadosAtualizacao.mostrarTelefone = perfil.mostrarTelefone;
-      dadosAtualizacao.mostrarEndereco = perfil.mostrarEndereco;
+      if (perfil.perfilPublico !== undefined) dadosAtualizacao.perfilPublico = !!perfil.perfilPublico;
+      if (perfil.mostrarTelefone !== undefined) dadosAtualizacao.mostrarTelefone = !!perfil.mostrarTelefone;
+      if (perfil.mostrarEndereco !== undefined) dadosAtualizacao.mostrarEndereco = !!perfil.mostrarEndereco;
       
       // Notificações
-      dadosAtualizacao.alertasVagas = perfil.alertasVagas;
-      dadosAtualizacao.frequenciaAlertas = perfil.frequenciaAlertas;
+      if (perfil.alertasVagas !== undefined) dadosAtualizacao.alertasVagas = !!perfil.alertasVagas;
+      setIfProvided('frequenciaAlertas', perfil.frequenciaAlertas);
       
       // Campos JSON
-      if (perfil.habilidades) {
+      if (perfil.habilidades !== undefined) {
         dadosAtualizacao.habilidades = Array.isArray(perfil.habilidades) 
           ? JSON.stringify(perfil.habilidades) 
           : perfil.habilidades;
       }
       
-      if (perfil.vagasInteresse) {
+      if (perfil.vagasInteresse !== undefined) {
         dadosAtualizacao.vagasInteresse = Array.isArray(perfil.vagasInteresse) 
           ? JSON.stringify(perfil.vagasInteresse) 
           : perfil.vagasInteresse;
       }
       
-      if (perfil.idiomas) {
+      if (perfil.idiomas !== undefined) {
         dadosAtualizacao.idiomas = Array.isArray(perfil.idiomas) 
           ? JSON.stringify(perfil.idiomas) 
           : perfil.idiomas;
       }
       
-      if (perfil.certificacoes) {
+      if (perfil.certificacoes !== undefined) {
         dadosAtualizacao.certificacoes = Array.isArray(perfil.certificacoes) 
           ? JSON.stringify(perfil.certificacoes) 
           : perfil.certificacoes;
       }
       
-      if (perfil.projetos) {
+      if (perfil.projetos !== undefined) {
         dadosAtualizacao.projetos = Array.isArray(perfil.projetos) 
           ? JSON.stringify(perfil.projetos) 
           : perfil.projetos;

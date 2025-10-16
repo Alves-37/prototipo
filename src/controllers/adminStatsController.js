@@ -5,9 +5,8 @@ exports.overview = async (req, res) => {
   try {
     const [usuariosTotal, usuariosAtivos, usuariosInativos] = await Promise.all([
       User.count(),
-      // Considera ativos como todos usuários (não há campo status; manter simples)
-      User.count(),
-      Promise.resolve(0)
+      User.count({ where: { suspended: false } }),
+      User.count({ where: { suspended: true } }),
     ]);
 
     const [denunciasTotal, denunciasAbertas, denunciasEmAnalise, denunciasResolvidas] = await Promise.all([

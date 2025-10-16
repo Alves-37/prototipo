@@ -7,6 +7,33 @@ function parsePagination(q) {
   const offset = (page - 1) * limit;
   return { page, limit, offset };
 }
+exports.desativar = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const user = await User.findByPk(id);
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+    user.suspended = true;
+    await user.save();
+    return res.json({ success: true, user: { id: user.id, suspended: user.suspended } });
+  } catch (err) {
+    console.error('Erro em admin usuarios desativar:', err);
+    return res.status(500).json({ error: 'Erro ao desativar usuário' });
+  }
+};
+
+exports.ativar = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const user = await User.findByPk(id);
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+    user.suspended = false;
+    await user.save();
+    return res.json({ success: true, user: { id: user.id, suspended: user.suspended } });
+  } catch (err) {
+    console.error('Erro em admin usuarios ativar:', err);
+    return res.status(500).json({ error: 'Erro ao ativar usuário' });
+  }
+};
 
 exports.list = async (req, res) => {
   try {

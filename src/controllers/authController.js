@@ -139,21 +139,25 @@ exports.login = async (req, res) => {
       return res.status(404).json({ error: 'Usuário não encontrado.' });
     }
     
-    // Verificar se a conta está suspensa (aguardando exclusão)
+    // Verificar se a conta está desativada/suspensa -> bloquear sempre
     if (user.suspended) {
       const now = new Date();
       const suspendedUntil = user.suspendedUntil ? new Date(user.suspendedUntil) : null;
-      
-      // Se ainda está dentro do período de suspensão
+      let payload = {
+        error: 'Conta desativada',
+        message: 'Sua conta está desativada. Entre em contato com o suporte para reativação.',
+        suspended: true,
+      };
       if (suspendedUntil && suspendedUntil > now) {
         const diasRestantes = Math.ceil((suspendedUntil - now) / (1000 * 60 * 60 * 24));
-        return res.status(403).json({ 
+        payload = {
           error: 'Conta suspensa',
           message: `Sua conta está suspensa e será excluída em ${diasRestantes} dia(s). Entre em contato com o suporte para cancelar a exclusão.`,
           suspended: true,
-          diasRestantes
-        });
+          diasRestantes,
+        };
       }
+      return res.status(403).json(payload);
     }
     
     const ok = await bcrypt.compare(senha, user.senha);
@@ -175,6 +179,11 @@ exports.googleCallback = async (req, res) => {
     const user = req.user;
     if (!user) {
       return res.redirect((process.env.FRONTEND_URL || 'http://localhost:5173') + '/login?error=google');
+    }
+    // Bloquear usuários suspensos também no OAuth
+    if (user.suspended) {
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      return res.redirect(`${frontendUrl}/login?error=suspended`);
     }
     const token = jwt.sign({ id: user.id, email: user.email, tipo: user.tipo }, JWT_SECRET, { expiresIn: '7d' });
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';

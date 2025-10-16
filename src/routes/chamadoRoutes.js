@@ -7,6 +7,7 @@ console.log('=== DEBUG: Registrando rotas de chamados ===');
 
 // Rotas públicas (apenas listagem e busca)
 router.get('/', chamadoController.listar);
+router.get('/:id', chamadoController.buscarPorId);
 
 // Rota de teste para respostas (temporária)
 router.get('/teste/respostas', chamadoController.testarRespostas);
@@ -49,7 +50,6 @@ router.put('/:chamadoId/respostas/:respostaId/aceitar', chamadoController.aceita
 router.put('/:id/favorito', chamadoController.toggleFavorito);
 
 // Rotas com parâmetros dinâmicos (DEVEM vir por último)
-router.get('/:id', chamadoController.buscarPorId);
 router.put('/:id', chamadoController.atualizar);
 router.delete('/:id', chamadoController.excluir);
 

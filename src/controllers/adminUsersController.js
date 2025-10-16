@@ -7,6 +7,21 @@ function parsePagination(q) {
   const offset = (page - 1) * limit;
   return { page, limit, offset };
 }
+
+// Excluir usuário definitivamente (admin)
+exports.excluir = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const user = await User.findByPk(id);
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+
+    await user.destroy();
+    return res.json({ success: true, deleted: true, id });
+  } catch (err) {
+    console.error('Erro em admin usuarios excluir:', err);
+    return res.status(500).json({ error: 'Erro ao excluir usuário' });
+  }
+};
 exports.desativar = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);

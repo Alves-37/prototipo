@@ -21,6 +21,7 @@ router.get('/system/info', versionController.get);
 router.get('/usuarios', adminUsersController.list);
 router.put('/usuarios/:id/desativar', adminUsersController.desativar);
 router.put('/usuarios/:id/ativar', adminUsersController.ativar);
+router.delete('/usuarios/:id', adminUsersController.excluir);
 
 // Denúncias
 router.get('/denuncias', adminDenunciasController.list);

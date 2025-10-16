@@ -86,6 +86,10 @@ const User = sequelize.define('User', {
     type: DataTypes.ENUM('diario', 'semanal', 'quinzenal'),
     defaultValue: 'diario',
   },
+  somNotificacoes: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
   vagasInteresse: DataTypes.TEXT, // JSON string
   
   // Campos complexos (JSON)

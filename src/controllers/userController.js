@@ -60,7 +60,8 @@ const filtrarCamposUsuario = (user) => {
         inscricaoFiscal: userData.inscricaoFiscal,
         anoFundacao: userData.anoFundacao,
         capitalSocial: userData.capitalSocial,
-        moedaCapital: userData.moedaCapital
+        moedaCapital: userData.moedaCapital,
+        somNotificacoes: Object.prototype.hasOwnProperty.call(userData, 'somNotificacoes') ? userData.somNotificacoes : undefined
       }
     };
   } else {
@@ -102,6 +103,7 @@ const filtrarCamposUsuario = (user) => {
         mostrarEndereco: userData.mostrarEndereco,
         alertasVagas: userData.alertasVagas,
         frequenciaAlertas: userData.frequenciaAlertas,
+        somNotificacoes: Object.prototype.hasOwnProperty.call(userData, 'somNotificacoes') ? userData.somNotificacoes : undefined,
         vagasInteresse: userData.vagasInteresse ? JSON.parse(userData.vagasInteresse) : [],
         idiomas: userData.idiomas ? JSON.parse(userData.idiomas) : [],
         certificacoes: userData.certificacoes ? JSON.parse(userData.certificacoes) : [],
@@ -212,6 +214,15 @@ exports.atualizar = async (req, res) => {
       // Notificações
       if (perfil.alertasVagas !== undefined) dadosAtualizacao.alertasVagas = !!perfil.alertasVagas;
       setIfProvided('frequenciaAlertas', perfil.frequenciaAlertas);
+      if (perfil.somNotificacoes !== undefined) {
+        // Atualiza apenas se a coluna existir no modelo
+        try {
+          const hasField = Object.prototype.hasOwnProperty.call(user.toJSON(), 'somNotificacoes');
+          if (hasField) {
+            dadosAtualizacao.somNotificacoes = !!perfil.somNotificacoes;
+          }
+        } catch {}
+      }
       
       // Campos JSON
       if (perfil.habilidades !== undefined) {
@@ -267,6 +278,17 @@ exports.atualizar = async (req, res) => {
       dadosAtualizacao.anoFundacao = toNullableInt(updateData.anoFundacao);
       dadosAtualizacao.capitalSocial = toNullableFloat(updateData.capitalSocial);
       dadosAtualizacao.moedaCapital = toNullable(updateData.moedaCapital);
+
+      // Preferências gerais também podem ser atualizadas para empresa, quando enviadas via perfil
+      const perfil = updateData.perfil || {};
+      if (perfil && perfil.somNotificacoes !== undefined) {
+        try {
+          const hasField = Object.prototype.hasOwnProperty.call(user.toJSON(), 'somNotificacoes');
+          if (hasField) {
+            dadosAtualizacao.somNotificacoes = !!perfil.somNotificacoes;
+          }
+        } catch {}
+      }
     }
     
     // Atualizar usuário

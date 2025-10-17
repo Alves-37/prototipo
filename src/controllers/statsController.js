@@ -20,6 +20,13 @@ exports.getStats = async (req, res) => {
       col: 'empresaId'
     });
 
+    // Contar empresas totais registradas
+    const empresasTotal = await User.count({
+      where: {
+        tipo: 'empresa'
+      }
+    });
+
     // Contar candidatos (usuários com tipo 'usuario')
     const candidatos = await User.count({
       where: {
@@ -39,6 +46,7 @@ exports.getStats = async (req, res) => {
     res.json({
       vagas,
       empresas,
+      empresasTotal,
       candidatos,
       chamados
     });
@@ -48,6 +56,7 @@ exports.getStats = async (req, res) => {
       error: 'Erro ao buscar estatísticas',
       vagas: 0,
       empresas: 0,
+      empresasTotal: 0,
       candidatos: 0,
       chamados: 0
     });

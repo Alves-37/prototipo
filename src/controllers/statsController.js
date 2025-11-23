@@ -20,12 +20,25 @@ exports.getStats = async (req, res) => {
       col: 'empresaId'
     });
 
-    // Contar empresas totais registradas
-    const empresasTotal = await User.count({
-      where: {
-        tipo: 'empresa'
-      }
+    // Contar empresas totais na plataforma (robusto):
+    // - Usuários com tipo 'empresa'
+    // - E também quaisquer usuários que já publicaram vagas (empresaId em Vaga)
+    const empresasUsuarios = await User.findAll({
+      where: { tipo: 'empresa' },
+      attributes: ['id']
     });
+
+    const empresasDeVagas = await Vaga.findAll({
+      attributes: ['empresaId'],
+      group: ['empresaId']
+    });
+
+    const setEmpresas = new Set([
+      ...empresasUsuarios.map(u => u.id),
+      ...empresasDeVagas.map(v => v.empresaId)
+    ]);
+
+    const empresasTotal = setEmpresas.size;
 
     // Contar candidatos (usuários com tipo 'usuario')
     const candidatos = await User.count({

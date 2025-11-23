@@ -13,8 +13,8 @@ Este guia descreve como publicar o backend (na raiz do repositório) no Railway 
 - Configuração de banco em `src/config/database.js` que:
   - Usa `DATABASE_PUBLIC_URL` (proxy pública) por padrão
   - Faz fallback para `DATABASE_URL` (host interno, para quando rodar no ambiente do Railway)
-  - Habilita SSL quando `DATABASE_SSL=true`
-  - Faz fallback para SQLite local se nenhuma URL for informada
+  - Habilita SSL quando `DATABASE_SSL=true` ou quando o host for uma proxy pública
+  - Usa, como último recurso, as URLs padrão fornecidas pelo projeto (Railway)
 - Sincronização do banco em `src/models/index.js` com `sync({ alter: true })` e fallbacks
 
 ## Variáveis de Ambiente (Railway)
@@ -22,9 +22,9 @@ Configure no Railway (Project > Variables):
 
 - `PORT` = 5000
 - `JWT_SECRET` = umsegredoseguro (ou outro segredo seguro)
-- `DATABASE_PUBLIC_URL` = postgresql://postgres:...@switchback.proxy.rlwy.net:18944/railway
-- `DATABASE_URL` = postgresql://postgres:...@postgres.railway.internal:5432/railway
-- `DATABASE_SSL` = true
+- `DATABASE_PUBLIC_URL` = `postgresql://postgres:OuKBYrRjizNBPFLJAYJjfumzhjgPHGjm@ballast.proxy.rlwy.net:27968/railway`
+- `DATABASE_URL` = `postgresql://postgres:OuKBYrRjizNBPFLJAYJjfumzhjgPHGjm@postgres.railway.internal:5432/railway`
+- `DATABASE_SSL` = `true`
 
 Obs.: Nunca exponha variáveis sensíveis em commits. Use apenas as variáveis no painel do Railway.
 

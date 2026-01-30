@@ -155,6 +155,20 @@ exports.toggleLike = async (req, res) => {
 
     const likes = await PostReaction.count({ where: { postId: id } });
 
+    try {
+      const io = req.app && req.app.get ? req.app.get('io') : null;
+      if (io) {
+        io.emit('post:like', {
+          postId: Number(id),
+          userId: Number(userId),
+          liked: !existing,
+          likes,
+        });
+      }
+    } catch (e) {
+      console.error('Falha ao emitir post:like:', e);
+    }
+
     return res.json({
       postId: Number(id),
       liked: !existing,
@@ -219,14 +233,31 @@ exports.addComment = async (req, res) => {
 
     const raw = typeof withAuthor.toJSON === 'function' ? withAuthor.toJSON() : withAuthor;
 
-    return res.status(201).json({
+    const payload = {
       id: raw.id,
       postId: raw.postId,
       userId: raw.userId,
       texto: raw.texto,
       createdAt: raw.createdAt,
       author: publicAuthor(req, raw.author),
-    });
+    };
+
+    try {
+      const io = req.app && req.app.get ? req.app.get('io') : null;
+      if (io) {
+        const comments = await PostComment.count({ where: { postId: id } });
+        io.emit('post:comment', {
+          postId: Number(id),
+          userId: Number(userId),
+          comment: payload,
+          comments,
+        });
+      }
+    } catch (e) {
+      console.error('Falha ao emitir post:comment:', e);
+    }
+
+    return res.status(201).json(payload);
   } catch (err) {
     console.error('Erro ao adicionar comentário:', err);
     return res.status(500).json({ error: 'Erro ao comentar' });

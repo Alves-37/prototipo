@@ -1,13 +1,31 @@
 // Ponto de entrada do backend Nevú
+const http = require('http');
+const { Server } = require('socket.io');
 const app = require('./src/app');
 const { syncDb, sequelize } = require('./src/models');
 
 const PORT = process.env.PORT || 5000;
 let server;
+let io;
 
 // Sincronizar banco e iniciar servidor
 syncDb().then(() => {
-  server = app.listen(PORT, () => {
+  server = http.createServer(app);
+
+  io = new Server(server, {
+    cors: {
+      origin: '*',
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    },
+  });
+
+  app.set('io', io);
+
+  io.on('connection', (socket) => {
+    socket.on('disconnect', () => {});
+  });
+
+  server.listen(PORT, () => {
     console.log(`Backend Nevú rodando na porta ${PORT}`);
   });
 });

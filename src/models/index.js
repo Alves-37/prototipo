@@ -13,9 +13,12 @@ require('./Denuncia');
 require('./Admin');
 require('./Apoio');
 require('./PushSubscription');
+require('./Post');
+require('./PostReaction');
+require('./PostComment');
 
 // Recupera instâncias a partir do registry do Sequelize
-const { User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription } = sequelize.models;
+const { User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, Post, PostReaction, PostComment } = sequelize.models;
 
 if (!User || !Vaga) {
   console.error('[Models] Registry incompleto. Disponíveis:', Object.keys(sequelize.models || {}));
@@ -74,6 +77,20 @@ Apoio.belongsTo(User, { foreignKey: 'usuarioId', as: 'usuario' });
 User.hasMany(PushSubscription, { foreignKey: 'userId', as: 'pushSubscriptions' });
 PushSubscription.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
+// Associações de posts
+User.hasMany(Post, { foreignKey: 'userId', as: 'posts' });
+Post.belongsTo(User, { foreignKey: 'userId', as: 'author' });
+
+Post.hasMany(PostReaction, { foreignKey: 'postId', as: 'reactions' });
+PostReaction.belongsTo(Post, { foreignKey: 'postId', as: 'post' });
+User.hasMany(PostReaction, { foreignKey: 'userId', as: 'postReactions' });
+PostReaction.belongsTo(User, { foreignKey: 'userId', as: 'author' });
+
+Post.hasMany(PostComment, { foreignKey: 'postId', as: 'comments' });
+PostComment.belongsTo(Post, { foreignKey: 'postId', as: 'post' });
+User.hasMany(PostComment, { foreignKey: 'userId', as: 'postComments' });
+PostComment.belongsTo(User, { foreignKey: 'userId', as: 'author' });
+
 const syncDb = async () => {
   try {
     if (process.env.NODE_ENV === 'production') {
@@ -108,4 +125,4 @@ const syncDb = async () => {
   }
 };
 
-module.exports = { sequelize, User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, syncDb };
+module.exports = { sequelize, User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, Post, PostReaction, PostComment, syncDb };

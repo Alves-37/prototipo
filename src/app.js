@@ -20,6 +20,9 @@ const passport = require('passport');
 const adminAuthRoutes = require('./routes/adminAuthRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const apoioPublicRoutes = require('./routes/apoioPublicRoutes');
+const feedRoutes = require('./routes/feedRoutes');
+const publicRoutes = require('./routes/publicRoutes');
+const postRoutes = require('./routes/postRoutes');
 
 // Configurar Passport (Google OAuth)
 try {
@@ -56,6 +59,9 @@ app.use('/api/stats', statsRoutes);
 app.use('/api/admin/auth', adminAuthRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/apoio', apoioPublicRoutes);
+app.use('/api/feed', feedRoutes);
+app.use('/api/public', publicRoutes);
+app.use('/api/posts', postRoutes);
 
 // Middleware de tratamento de erros
 app.use((err, req, res, next) => {

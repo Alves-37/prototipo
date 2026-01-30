@@ -16,9 +16,10 @@ require('./PushSubscription');
 require('./Post');
 require('./PostReaction');
 require('./PostComment');
+require('./Connection');
 
 // Recupera instâncias a partir do registry do Sequelize
-const { User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, Post, PostReaction, PostComment } = sequelize.models;
+const { User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, Post, PostReaction, PostComment, Connection } = sequelize.models;
 
 if (!User || !Vaga) {
   console.error('[Models] Registry incompleto. Disponíveis:', Object.keys(sequelize.models || {}));
@@ -90,6 +91,12 @@ Post.hasMany(PostComment, { foreignKey: 'postId', as: 'comments' });
 PostComment.belongsTo(Post, { foreignKey: 'postId', as: 'post' });
 User.hasMany(PostComment, { foreignKey: 'userId', as: 'postComments' });
 PostComment.belongsTo(User, { foreignKey: 'userId', as: 'author' });
+
+// Associações de conexões
+User.hasMany(Connection, { foreignKey: 'requesterId', as: 'connectionRequestsSent' });
+User.hasMany(Connection, { foreignKey: 'addresseeId', as: 'connectionRequestsReceived' });
+Connection.belongsTo(User, { foreignKey: 'requesterId', as: 'requester' });
+Connection.belongsTo(User, { foreignKey: 'addresseeId', as: 'addressee' });
 
 const syncDb = async () => {
   try {

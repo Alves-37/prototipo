@@ -23,6 +23,7 @@ const apoioPublicRoutes = require('./routes/apoioPublicRoutes');
 const feedRoutes = require('./routes/feedRoutes');
 const publicRoutes = require('./routes/publicRoutes');
 const postRoutes = require('./routes/postRoutes');
+const connectionRoutes = require('./routes/connectionRoutes');
 
 // Configurar Passport (Google OAuth)
 try {
@@ -62,6 +63,7 @@ app.use('/api/apoio', apoioPublicRoutes);
 app.use('/api/feed', feedRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/posts', postRoutes);
+app.use('/api/connections', connectionRoutes);
 
 // Middleware de tratamento de erros
 app.use((err, req, res, next) => {

@@ -33,6 +33,25 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
+const optionalAuthMiddleware = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return next();
+    }
+
+    const token = authHeader.substring(7);
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = await User.findByPk(decoded.id);
+    if (user) {
+      req.user = user;
+    }
+    return next();
+  } catch {
+    return next();
+  }
+};
+
 // Middleware para verificar se é empresa
 const empresaMiddleware = (req, res, next) => {
   if (req.user.tipo !== 'empresa') {
@@ -51,6 +70,7 @@ const usuarioMiddleware = (req, res, next) => {
 
 module.exports = {
   authMiddleware,
+  optionalAuthMiddleware,
   empresaMiddleware,
   usuarioMiddleware
-}; 
+};

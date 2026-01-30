@@ -101,6 +101,18 @@ exports.getFeed = async (req, res) => {
       const reactionMap = Object.fromEntries(reactionCounts.map(r => [String(r.postId), Number(r.count) || 0]));
       const commentMap = Object.fromEntries(commentCounts.map(r => [String(r.postId), Number(r.count) || 0]));
 
+      const myLikedSet = new Set();
+      if (req.user && postIds.length) {
+        const myReactions = await PostReaction.findAll({
+          attributes: ['postId'],
+          where: { postId: postIds, userId: req.user.id },
+          raw: true,
+        });
+        for (const r of myReactions) {
+          myLikedSet.add(String(r.postId));
+        }
+      }
+
       for (const p of posts) {
         const raw = typeof p.toJSON === 'function' ? p.toJSON() : p;
         const author = raw.author || null;
@@ -117,6 +129,7 @@ exports.getFeed = async (req, res) => {
           texto: raw.texto,
           imageUrl: toAbsolute(req, raw.imageUrl),
           avatarUrl,
+          likedByMe: req.user ? myLikedSet.has(String(raw.id)) : false,
           counts: {
             likes: reactionMap[String(raw.id)] || 0,
             comments: commentMap[String(raw.id)] || 0,

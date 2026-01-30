@@ -1,4 +1,4 @@
-const { Post, PostReaction, PostComment, User } = require('../models');
+const { Post, PostReaction, PostComment, User, Notificacao } = require('../models');
 
 const toAbsolute = (req, maybePath) => {
   if (!maybePath) return null;
@@ -182,6 +182,37 @@ exports.toggleLike = async (req, res) => {
 
     const likes = await PostReaction.count({ where: { postId: id } });
 
+    // Notificação para o dono do post (somente quando adiciona like)
+    try {
+      const postOwnerId = post.userId;
+      if (!existing && postOwnerId && Number(postOwnerId) !== Number(userId)) {
+        const actorName = req.user?.nome || 'Alguém';
+        const notif = await Notificacao.create({
+          usuarioId: postOwnerId,
+          tipo: 'sistema',
+          titulo: 'Curtida',
+          mensagem: `${actorName} curtiu seu post.`,
+          referenciaTipo: 'outro',
+          referenciaId: Number(id),
+          lida: false,
+        });
+
+        const io = req.app && req.app.get ? req.app.get('io') : null;
+        if (io) {
+          io.to(`user:${postOwnerId}`).emit('notification:new', {
+            id: notif.id,
+            usuarioId: postOwnerId,
+            titulo: notif.titulo,
+            mensagem: notif.mensagem,
+            lida: notif.lida,
+            createdAt: notif.createdAt,
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Falha ao criar/emitir notificação de curtida:', e);
+    }
+
     try {
       const io = req.app && req.app.get ? req.app.get('io') : null;
       if (io) {
@@ -268,6 +299,38 @@ exports.addComment = async (req, res) => {
       createdAt: raw.createdAt,
       author: publicAuthor(req, raw.author),
     };
+
+    // Notificação para o dono do post
+    try {
+      const postOwnerId = post.userId;
+      if (postOwnerId && Number(postOwnerId) !== Number(userId)) {
+        const actorName = req.user?.nome || 'Alguém';
+        const preview = String(t).length > 60 ? `${String(t).slice(0, 60)}...` : String(t);
+        const notif = await Notificacao.create({
+          usuarioId: postOwnerId,
+          tipo: 'sistema',
+          titulo: 'Comentário',
+          mensagem: `${actorName} comentou no seu post: ${preview}`,
+          referenciaTipo: 'outro',
+          referenciaId: Number(id),
+          lida: false,
+        });
+
+        const io = req.app && req.app.get ? req.app.get('io') : null;
+        if (io) {
+          io.to(`user:${postOwnerId}`).emit('notification:new', {
+            id: notif.id,
+            usuarioId: postOwnerId,
+            titulo: notif.titulo,
+            mensagem: notif.mensagem,
+            lida: notif.lida,
+            createdAt: notif.createdAt,
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Falha ao criar/emitir notificação de comentário:', e);
+    }
 
     try {
       const io = req.app && req.app.get ? req.app.get('io') : null;

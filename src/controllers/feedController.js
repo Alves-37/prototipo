@@ -236,6 +236,21 @@ exports.getFeed = async (req, res) => {
   }
 };
 
+exports.getPublicUserById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ error: 'ID inválido' });
+
+    const user = await User.findByPk(id);
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+
+    return res.json(toPublicUser(req, user));
+  } catch (err) {
+    console.error('Erro ao buscar usuário público:', err);
+    return res.status(500).json({ error: 'Erro ao buscar usuário' });
+  }
+};
+
 exports.listPublicUsers = async (req, res) => {
   try {
     const { tipo = 'todos', q = '', page = 1, limit = 20 } = req.query;

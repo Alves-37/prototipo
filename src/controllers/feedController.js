@@ -211,9 +211,47 @@ exports.getFeed = async (req, res) => {
         offset,
       });
 
+      const companyIds = users
+        .filter(u => {
+          const raw = typeof u?.toJSON === 'function' ? u.toJSON() : u;
+          return raw?.tipo === 'empresa';
+        })
+        .map(u => {
+          const raw = typeof u?.toJSON === 'function' ? u.toJSON() : u;
+          return raw?.id;
+        })
+        .filter(Boolean);
+
+      const companyPostsRows = companyIds.length
+        ? await Post.findAll({
+            attributes: ['userId', [Post.sequelize.fn('COUNT', Post.sequelize.col('id')), 'count']],
+            where: { userId: companyIds },
+            group: ['userId'],
+            raw: true,
+          })
+        : [];
+      const companyPostsMap = Object.fromEntries(companyPostsRows.map(r => [String(r.userId), Number(r.count) || 0]));
+
+      const companyVagasRows = companyIds.length
+        ? await Vaga.findAll({
+            attributes: ['empresaId', [Vaga.sequelize.fn('COUNT', Vaga.sequelize.col('id')), 'count']],
+            where: { empresaId: companyIds, status: 'publicada' },
+            group: ['empresaId'],
+            raw: true,
+          })
+        : [];
+      const companyVagasMap = Object.fromEntries(companyVagasRows.map(r => [String(r.empresaId), Number(r.count) || 0]));
+
       for (const u of users) {
         const pub = toPublicUser(req, u);
         if (!pub) continue;
+
+        if (pub.tipo === 'empresa') {
+          const postsCount = companyPostsMap[String(pub.id)] || 0;
+          const vagasCount = companyVagasMap[String(pub.id)] || 0;
+          if (postsCount === 0 && vagasCount === 0) continue;
+        }
+
         items.push({
           type: pub.tipo === 'empresa' ? 'empresa' : 'pessoa',
           id: pub.id,

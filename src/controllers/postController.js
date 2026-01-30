@@ -23,13 +23,20 @@ const publicAuthor = (req, user) => {
 
 exports.list = async (req, res) => {
   try {
-    const { page = 1, limit = 20 } = req.query;
+    const { page = 1, limit = 20, userId } = req.query;
 
     const pageNum = Math.max(parseInt(page, 10) || 1, 1);
     const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 50);
     const offset = (pageNum - 1) * limitNum;
 
+    const where = {};
+    if (userId !== undefined && userId !== null && String(userId).trim() !== '') {
+      const asNumber = Number(userId);
+      where.userId = Number.isFinite(asNumber) ? asNumber : String(userId);
+    }
+
     const { rows, count } = await Post.findAndCountAll({
+      where,
       order: [['createdAt', 'DESC']],
       limit: limitNum,
       offset,

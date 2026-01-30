@@ -1,4 +1,4 @@
-const { Connection, User } = require('../models');
+const { Connection, User, Notificacao } = require('../models');
 
 const publicUser = (u) => {
   if (!u) return null;
@@ -80,6 +80,34 @@ exports.request = async (req, res) => {
       conn = await Connection.create({ requesterId: me, addresseeId: other, status: 'pending' });
     }
 
+    try {
+      const title = 'Novo pedido de conexão';
+      const meName = req.user?.nome || 'Alguém';
+      const notif = await Notificacao.create({
+        usuarioId: other,
+        tipo: 'sistema',
+        titulo: title,
+        mensagem: `${meName} quer se conectar com você.`,
+        referenciaTipo: 'outro',
+        referenciaId: conn.id,
+        lida: false,
+      });
+
+      const io = req.app && req.app.get ? req.app.get('io') : null;
+      if (io) {
+        io.to(`user:${other}`).emit('notification:new', {
+          id: notif.id,
+          usuarioId: other,
+          titulo: notif.titulo,
+          mensagem: notif.mensagem,
+          lida: notif.lida,
+          createdAt: notif.createdAt,
+        });
+      }
+    } catch (e) {
+      console.error('Falha ao criar/emitir notificação de conexão (pedido):', e);
+    }
+
     return res.status(201).json({ status: 'pending_outgoing', requestId: conn.id });
   } catch (err) {
     console.error('Erro ao solicitar conexão:', err);
@@ -125,6 +153,35 @@ exports.accept = async (req, res) => {
     if (conn.status !== 'pending') return res.status(400).json({ error: 'Solicitação não está pendente' });
 
     await conn.update({ status: 'accepted' });
+
+    try {
+      const requesterId = conn.requesterId;
+      const meName = req.user?.nome || 'Alguém';
+      const notif = await Notificacao.create({
+        usuarioId: requesterId,
+        tipo: 'sistema',
+        titulo: 'Conexão aceita',
+        mensagem: `${meName} aceitou seu pedido de conexão.`,
+        referenciaTipo: 'outro',
+        referenciaId: conn.id,
+        lida: false,
+      });
+
+      const io = req.app && req.app.get ? req.app.get('io') : null;
+      if (io) {
+        io.to(`user:${requesterId}`).emit('notification:new', {
+          id: notif.id,
+          usuarioId: requesterId,
+          titulo: notif.titulo,
+          mensagem: notif.mensagem,
+          lida: notif.lida,
+          createdAt: notif.createdAt,
+        });
+      }
+    } catch (e) {
+      console.error('Falha ao criar/emitir notificação de conexão (aceite):', e);
+    }
+
     return res.json({ status: 'connected' });
   } catch (err) {
     console.error('Erro ao aceitar conexão:', err);

@@ -1,6 +1,7 @@
 // Ponto de entrada do backend Nevú
 const http = require('http');
 const { Server } = require('socket.io');
+const jwt = require('jsonwebtoken');
 const app = require('./src/app');
 const { syncDb, sequelize } = require('./src/models');
 
@@ -21,7 +22,37 @@ syncDb().then(() => {
 
   app.set('io', io);
 
+  const JWT_SECRET = process.env.JWT_SECRET || 'umsegredoseguro';
+
+  io.use((socket, next) => {
+    try {
+      const rawAuthToken = socket?.handshake?.auth?.token;
+      const rawQueryToken = socket?.handshake?.query?.token;
+      const rawHeaderAuth = socket?.handshake?.headers?.authorization;
+
+      const token = rawAuthToken
+        || rawQueryToken
+        || (typeof rawHeaderAuth === 'string' && rawHeaderAuth.startsWith('Bearer ') ? rawHeaderAuth.substring(7) : null);
+
+      if (!token) return next();
+
+      const decoded = jwt.verify(token, JWT_SECRET);
+      if (decoded && decoded.id) {
+        socket.userId = Number(decoded.id);
+      }
+
+      return next();
+    } catch {
+      return next();
+    }
+  });
+
   io.on('connection', (socket) => {
+    try {
+      if (socket.userId) {
+        socket.join(`user:${socket.userId}`);
+      }
+    } catch {}
     socket.on('disconnect', () => {});
   });
 

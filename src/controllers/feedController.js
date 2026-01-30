@@ -1,4 +1,4 @@
-const { User, Vaga, Post, PostReaction, PostComment } = require('../models');
+const { User, Vaga, Post, PostReaction, PostComment, Connection } = require('../models');
 const { Op } = require('sequelize');
 
 const toAbsolute = (req, maybePath) => {
@@ -257,7 +257,31 @@ exports.getPublicUserById = async (req, res) => {
     const user = await User.findByPk(id);
     if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
 
-    return res.json(toPublicUser(req, user));
+    const pub = toPublicUser(req, user);
+    if (!pub) return res.status(404).json({ error: 'Usuário não encontrado' });
+
+    const numericId = Number(id);
+    const userId = Number.isFinite(numericId) ? numericId : id;
+
+    const postsCount = await Post.count({ where: { userId } });
+
+    const connectionsCount = await Connection.count({
+      where: {
+        status: 'accepted',
+        [Op.or]: [
+          { requesterId: userId },
+          { addresseeId: userId },
+        ],
+      },
+    });
+
+    return res.json({
+      ...pub,
+      stats: {
+        posts: postsCount,
+        connections: connectionsCount,
+      },
+    });
   } catch (err) {
     console.error('Erro ao buscar usuário público:', err);
     return res.status(500).json({ error: 'Erro ao buscar usuário' });

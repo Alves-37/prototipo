@@ -122,6 +122,33 @@ exports.create = async (req, res) => {
 
     const raw = typeof post.toJSON === 'function' ? post.toJSON() : post;
 
+    try {
+      const io = req.app && req.app.get ? req.app.get('io') : null;
+      if (io) {
+        const author = raw.author || null;
+        const avatarUrl = author?.tipo === 'empresa'
+          ? toAbsolute(req, author.logo)
+          : toAbsolute(req, author.foto);
+
+        io.emit('post:new', {
+          item: {
+            type: 'post',
+            id: raw.id,
+            createdAt: raw.createdAt,
+            dataPublicacao: raw.createdAt,
+            nome: author?.nome || 'Usuário',
+            texto: raw.texto,
+            imageUrl: toAbsolute(req, raw.imageUrl),
+            avatarUrl,
+            likedByMe: false,
+            counts: { likes: 0, comments: 0 },
+          },
+        });
+      }
+    } catch (e) {
+      console.error('Falha ao emitir post:new:', e);
+    }
+
     return res.status(201).json({
       id: raw.id,
       userId: raw.userId,

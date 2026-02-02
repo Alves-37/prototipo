@@ -270,7 +270,7 @@ exports.getFeed = async (req, res) => {
         const perfil = pub.perfil || {};
         const hasProfileInfo = pub.tipo === 'empresa'
           ? !!(perfil.descricao || perfil.endereco || perfil.setor || perfil.website)
-          : !!(perfil.bio || perfil.experiencia || perfil.formacao || perfil.endereco);
+          : !!(perfil.bio || perfil.experiencia || perfil.formacao || perfil.endereco || perfil.resumo || (Array.isArray(perfil.habilidades) && perfil.habilidades.length));
         if (!hasProfileInfo) continue;
 
         if (pub.tipo === 'empresa') {

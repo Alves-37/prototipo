@@ -1,4 +1,4 @@
-const { User, Vaga, Post, PostReaction, PostComment, Connection } = require('../models');
+const { User, Vaga, Post, PostReaction, PostComment, Connection, Chamado } = require('../models');
 const { Op } = require('sequelize');
 
 const toAbsolute = (req, maybePath) => {
@@ -53,6 +53,7 @@ exports.getFeed = async (req, res) => {
 
     const shouldIncludeVagas = tab === 'todos' || tab === 'vagas';
     const shouldIncludePessoas = tab === 'pessoas';
+    const shouldIncludeServicos = tab === 'servicos';
     const shouldIncludePosts = tab === 'todos' || tab === 'posts' || tab === 'postagens';
 
     if (shouldIncludePosts) {
@@ -134,6 +135,66 @@ exports.getFeed = async (req, res) => {
             likes: reactionMap[String(raw.id)] || 0,
             comments: commentMap[String(raw.id)] || 0,
           },
+        });
+      }
+    }
+
+    if (shouldIncludeServicos) {
+      const chamadoWhere = {
+        ...(query
+          ? {
+              [Op.or]: [
+                { titulo: { [Op.like]: `%${query}%` } },
+                { descricao: { [Op.like]: `%${query}%` } },
+                { localizacao: { [Op.like]: `%${query}%` } },
+              ],
+            }
+          : {}),
+      };
+
+      const chamados = await Chamado.findAll({
+        where: chamadoWhere,
+        include: [
+          {
+            model: User,
+            as: 'usuario',
+            attributes: ['id', 'nome', 'tipo', 'foto', 'logo'],
+          },
+        ],
+        order: [['data', 'DESC']],
+        limit: limitNum,
+        offset,
+      });
+
+      for (const c of chamados) {
+        const raw = typeof c.toJSON === 'function' ? c.toJSON() : c;
+        const author = raw.usuario || null;
+        const avatarUrl = author?.tipo === 'empresa'
+          ? toAbsolute(req, author.logo)
+          : toAbsolute(req, author.foto);
+
+        items.push({
+          type: 'servico',
+          id: raw.id,
+          createdAt: raw.data || raw.createdAt,
+          dataPublicacao: raw.data || raw.createdAt,
+          titulo: raw.titulo,
+          descricao: raw.descricao,
+          categoria: raw.categoria,
+          localizacao: raw.localizacao,
+          orcamento: raw.orcamento,
+          prazo: raw.prazo,
+          prioridade: raw.prioridade,
+          status: raw.status,
+          nome: author?.nome || 'Usuário',
+          avatarUrl,
+          author: author
+            ? {
+                id: author.id,
+                nome: author.nome,
+                tipo: author.tipo,
+              }
+            : null,
         });
       }
     }

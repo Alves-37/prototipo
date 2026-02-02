@@ -14,6 +14,68 @@ const toPublicUser = (req, u) => {
   if (!u) return null;
   const raw = typeof u.toJSON === 'function' ? u.toJSON() : u;
 
+  if (Object.prototype.hasOwnProperty.call(raw, 'perfilPublico') && raw.perfilPublico === false) {
+    return null;
+  }
+
+  let habilidades = [];
+  try {
+    if (Array.isArray(raw.habilidades)) {
+      habilidades = raw.habilidades;
+    } else if (typeof raw.habilidades === 'string') {
+      habilidades = JSON.parse(raw.habilidades);
+    }
+  } catch (e) {
+    habilidades = [];
+  }
+
+  let idiomas = [];
+  try {
+    if (Array.isArray(raw.idiomas)) {
+      idiomas = raw.idiomas;
+    } else if (typeof raw.idiomas === 'string') {
+      idiomas = JSON.parse(raw.idiomas);
+    }
+  } catch (e) {
+    idiomas = [];
+  }
+
+  let certificacoes = [];
+  try {
+    if (Array.isArray(raw.certificacoes)) {
+      certificacoes = raw.certificacoes;
+    } else if (typeof raw.certificacoes === 'string') {
+      certificacoes = JSON.parse(raw.certificacoes);
+    }
+  } catch (e) {
+    certificacoes = [];
+  }
+
+  let projetos = [];
+  try {
+    if (Array.isArray(raw.projetos)) {
+      projetos = raw.projetos;
+    } else if (typeof raw.projetos === 'string') {
+      projetos = JSON.parse(raw.projetos);
+    }
+  } catch (e) {
+    projetos = [];
+  }
+
+  let vagasInteresse = [];
+  try {
+    if (Array.isArray(raw.vagasInteresse)) {
+      vagasInteresse = raw.vagasInteresse;
+    } else if (typeof raw.vagasInteresse === 'string') {
+      vagasInteresse = JSON.parse(raw.vagasInteresse);
+    }
+  } catch (e) {
+    vagasInteresse = [];
+  }
+
+  const mostrarTelefone = Object.prototype.hasOwnProperty.call(raw, 'mostrarTelefone') ? !!raw.mostrarTelefone : false;
+  const mostrarEndereco = Object.prototype.hasOwnProperty.call(raw, 'mostrarEndereco') ? !!raw.mostrarEndereco : false;
+
   return {
     id: raw.id,
     nome: raw.nome,
@@ -34,7 +96,30 @@ const toPublicUser = (req, u) => {
           bio: raw.bio || null,
           experiencia: raw.experiencia || null,
           formacao: raw.formacao || null,
-          endereco: raw.endereco || null,
+          instituicao: raw.instituicao || null,
+          resumo: raw.resumo || null,
+          habilidades,
+          idiomas,
+          certificacoes,
+          projetos,
+          vagasInteresse,
+          // Redes
+          linkedin: raw.linkedin || null,
+          github: raw.github || null,
+          portfolio: raw.portfolio || null,
+          behance: raw.behance || null,
+          instagram: raw.instagram || null,
+          twitter: raw.twitter || null,
+          // Preferências
+          tipoTrabalho: raw.tipoTrabalho || null,
+          faixaSalarial: raw.faixaSalarial || null,
+          localizacaoPreferida: raw.localizacaoPreferida || null,
+          disponibilidade: raw.disponibilidade || null,
+          perfilPublico: Object.prototype.hasOwnProperty.call(raw, 'perfilPublico') ? !!raw.perfilPublico : true,
+          mostrarTelefone,
+          mostrarEndereco,
+          telefone: mostrarTelefone ? (raw.telefone || null) : null,
+          endereco: mostrarEndereco ? (raw.endereco || null) : null,
         },
   };
 };

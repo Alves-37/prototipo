@@ -52,7 +52,7 @@ exports.getFeed = async (req, res) => {
     const items = [];
 
     const shouldIncludeVagas = tab === 'todos' || tab === 'vagas';
-    const shouldIncludePessoas = tab === 'todos' || tab === 'pessoas';
+    const shouldIncludePessoas = tab === 'pessoas';
     const shouldIncludePosts = tab === 'todos' || tab === 'posts' || tab === 'postagens';
 
     if (shouldIncludePosts) {
@@ -242,14 +242,44 @@ exports.getFeed = async (req, res) => {
         : [];
       const companyVagasMap = Object.fromEntries(companyVagasRows.map(r => [String(r.empresaId), Number(r.count) || 0]));
 
+      const personIds = users
+        .filter(u => {
+          const raw = typeof u?.toJSON === 'function' ? u.toJSON() : u;
+          return raw?.tipo !== 'empresa';
+        })
+        .map(u => {
+          const raw = typeof u?.toJSON === 'function' ? u.toJSON() : u;
+          return raw?.id;
+        })
+        .filter(Boolean);
+
+      const personPostsRows = personIds.length
+        ? await Post.findAll({
+            attributes: ['userId', [Post.sequelize.fn('COUNT', Post.sequelize.col('id')), 'count']],
+            where: { userId: personIds },
+            group: ['userId'],
+            raw: true,
+          })
+        : [];
+      const personPostsMap = Object.fromEntries(personPostsRows.map(r => [String(r.userId), Number(r.count) || 0]));
+
       for (const u of users) {
         const pub = toPublicUser(req, u);
         if (!pub) continue;
+
+        const perfil = pub.perfil || {};
+        const hasProfileInfo = pub.tipo === 'empresa'
+          ? !!(perfil.descricao || perfil.endereco || perfil.setor || perfil.website)
+          : !!(perfil.bio || perfil.experiencia || perfil.formacao || perfil.endereco);
+        if (!hasProfileInfo) continue;
 
         if (pub.tipo === 'empresa') {
           const postsCount = companyPostsMap[String(pub.id)] || 0;
           const vagasCount = companyVagasMap[String(pub.id)] || 0;
           if (postsCount === 0 && vagasCount === 0) continue;
+        } else {
+          const postsCount = personPostsMap[String(pub.id)] || 0;
+          if (postsCount === 0) continue;
         }
 
         items.push({

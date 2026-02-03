@@ -466,3 +466,112 @@ exports.addComment = async (req, res) => {
     return res.status(500).json({ error: 'Erro ao comentar' });
   }
 };
+
+exports.updateComment = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { id, commentId } = req.params;
+    const { texto } = req.body || {};
+
+    const t = typeof texto === 'string' ? texto.trim() : '';
+    if (!t) return res.status(400).json({ error: 'Comentário inválido' });
+
+    const post = await Post.findByPk(id);
+    if (!post) return res.status(404).json({ error: 'Post não encontrado' });
+
+    const comment = await PostComment.findByPk(commentId);
+    if (!comment || String(comment.postId) !== String(id)) {
+      return res.status(404).json({ error: 'Comentário não encontrado' });
+    }
+
+    if (Number(comment.userId) !== Number(userId)) {
+      return res.status(403).json({ error: 'Sem permissão para editar este comentário' });
+    }
+
+    await comment.update({ texto: t });
+
+    const withAuthor = await PostComment.findByPk(comment.id, {
+      include: [{ model: User, as: 'author', attributes: ['id', 'nome', 'tipo', 'foto', 'logo'] }],
+    });
+
+    const raw = typeof withAuthor.toJSON === 'function' ? withAuthor.toJSON() : withAuthor;
+
+    const payload = {
+      id: raw.id,
+      postId: raw.postId,
+      userId: raw.userId,
+      texto: raw.texto,
+      createdAt: raw.createdAt,
+      updatedAt: raw.updatedAt,
+      author: publicAuthor(req, raw.author),
+    };
+
+    try {
+      const io = req.app && req.app.get ? req.app.get('io') : null;
+      if (io) {
+        const comments = await PostComment.count({ where: { postId: id } });
+        io.emit('post:comment:update', {
+          postId: Number(id),
+          userId: Number(userId),
+          comment: payload,
+          comments,
+        });
+      }
+    } catch (e) {
+      console.error('Falha ao emitir post:comment:update:', e);
+    }
+
+    return res.json(payload);
+  } catch (err) {
+    console.error('Erro ao editar comentário:', err);
+    return res.status(500).json({ error: 'Erro ao editar comentário' });
+  }
+};
+
+exports.removeComment = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { id, commentId } = req.params;
+
+    const post = await Post.findByPk(id);
+    if (!post) return res.status(404).json({ error: 'Post não encontrado' });
+
+    const comment = await PostComment.findByPk(commentId);
+    if (!comment || String(comment.postId) !== String(id)) {
+      return res.status(404).json({ error: 'Comentário não encontrado' });
+    }
+
+    const isCommentOwner = Number(comment.userId) === Number(userId);
+    const isPostOwner = Number(post.userId) === Number(userId);
+
+    if (!isCommentOwner && !isPostOwner) {
+      return res.status(403).json({ error: 'Sem permissão para eliminar este comentário' });
+    }
+
+    await comment.destroy();
+
+    try {
+      const io = req.app && req.app.get ? req.app.get('io') : null;
+      if (io) {
+        const comments = await PostComment.count({ where: { postId: id } });
+        io.emit('post:comment:delete', {
+          postId: Number(id),
+          userId: Number(userId),
+          commentId: Number(commentId),
+          comments,
+        });
+      }
+    } catch (e) {
+      console.error('Falha ao emitir post:comment:delete:', e);
+    }
+
+    return res.json({
+      ok: true,
+      postId: Number(id),
+      commentId: Number(commentId),
+    });
+  } catch (err) {
+    console.error('Erro ao eliminar comentário:', err);
+    return res.status(500).json({ error: 'Erro ao eliminar comentário' });
+  }
+};

@@ -13,5 +13,7 @@ router.put('/:id', authMiddleware, postController.update);
 router.delete('/:id', authMiddleware, postController.remove);
 router.post('/:id/like', authMiddleware, postController.toggleLike);
 router.post('/:id/comments', authMiddleware, postController.addComment);
+router.put('/:id/comments/:commentId', authMiddleware, postController.updateComment);
+router.delete('/:id/comments/:commentId', authMiddleware, postController.removeComment);
 
 module.exports = router;

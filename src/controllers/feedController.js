@@ -338,6 +338,7 @@ exports.getFeed = async (req, res) => {
           nivelExperiencia: raw.nivelExperiencia,
           salario: raw.salario,
           empresa: raw.empresa ? raw.empresa.nome : null,
+          avatarUrl: raw.empresa ? toAbsolute(req, raw.empresa.logo) : null,
           empresaObj: raw.empresa
             ? {
                 id: raw.empresa.id,

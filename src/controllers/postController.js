@@ -164,6 +164,119 @@ exports.create = async (req, res) => {
   }
 };
 
+exports.update = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { id } = req.params;
+    const { texto, imageUrl } = req.body || {};
+
+    const post = await Post.findByPk(id);
+    if (!post) return res.status(404).json({ error: 'Post não encontrado' });
+
+    if (Number(post.userId) !== Number(userId)) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+
+    const patch = {};
+
+    if (texto !== undefined) {
+      const t = typeof texto === 'string' ? texto.trim() : '';
+      patch.texto = t ? t : null;
+    }
+
+    if (imageUrl !== undefined) {
+      const img = typeof imageUrl === 'string' ? imageUrl.trim() : '';
+      patch.imageUrl = img ? img : null;
+    }
+
+    const nextTexto = Object.prototype.hasOwnProperty.call(patch, 'texto') ? patch.texto : post.texto;
+    const nextImage = Object.prototype.hasOwnProperty.call(patch, 'imageUrl') ? patch.imageUrl : post.imageUrl;
+
+    if (!nextTexto && !nextImage) {
+      return res.status(400).json({ error: 'Informe texto ou imagem.' });
+    }
+
+    await post.update(patch);
+
+    const withAuthor = await Post.findByPk(post.id, {
+      include: [{ model: User, as: 'author', attributes: ['id', 'nome', 'tipo', 'foto', 'logo'] }],
+    });
+
+    const raw = typeof withAuthor.toJSON === 'function' ? withAuthor.toJSON() : withAuthor;
+
+    const likes = await PostReaction.count({ where: { postId: post.id } });
+    const comments = await PostComment.count({ where: { postId: post.id } });
+
+    try {
+      const io = req.app && req.app.get ? req.app.get('io') : null;
+      if (io) {
+        io.emit('post:update', {
+          postId: Number(post.id),
+          item: {
+            type: 'post',
+            id: raw.id,
+            userId: raw.userId,
+            createdAt: raw.createdAt,
+            dataPublicacao: raw.createdAt,
+            nome: raw.author?.nome || 'Usuário',
+            texto: raw.texto,
+            imageUrl: toAbsolute(req, raw.imageUrl),
+            avatarUrl: raw.author?.tipo === 'empresa' ? toAbsolute(req, raw.author?.logo) : toAbsolute(req, raw.author?.foto),
+            counts: { likes, comments },
+          },
+        });
+      }
+    } catch (e) {
+      console.error('Falha ao emitir post:update:', e);
+    }
+
+    return res.json({
+      id: raw.id,
+      userId: raw.userId,
+      texto: raw.texto,
+      imageUrl: toAbsolute(req, raw.imageUrl),
+      createdAt: raw.createdAt,
+      author: publicAuthor(req, raw.author),
+      counts: { likes, comments },
+    });
+  } catch (err) {
+    console.error('Erro ao atualizar post:', err);
+    return res.status(500).json({ error: 'Erro ao atualizar post' });
+  }
+};
+
+exports.remove = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { id } = req.params;
+
+    const post = await Post.findByPk(id);
+    if (!post) return res.status(404).json({ error: 'Post não encontrado' });
+
+    if (Number(post.userId) !== Number(userId)) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+
+    await PostReaction.destroy({ where: { postId: id } });
+    await PostComment.destroy({ where: { postId: id } });
+    await post.destroy();
+
+    try {
+      const io = req.app && req.app.get ? req.app.get('io') : null;
+      if (io) {
+        io.emit('post:delete', { postId: Number(id), userId: Number(userId) });
+      }
+    } catch (e) {
+      console.error('Falha ao emitir post:delete:', e);
+    }
+
+    return res.json({ ok: true, postId: Number(id) });
+  } catch (err) {
+    console.error('Erro ao eliminar post:', err);
+    return res.status(500).json({ error: 'Erro ao eliminar post' });
+  }
+};
+
 exports.toggleLike = async (req, res) => {
   try {
     const userId = req.user.id;

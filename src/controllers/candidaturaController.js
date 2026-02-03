@@ -6,6 +6,10 @@ exports.criar = async (req, res) => {
     const { vagaId, mensagem, telefone, linkedin, disponibilidade } = req.body;
     const usuarioId = req.user.id;
 
+    if (req.user?.tipo !== 'usuario') {
+      return res.status(403).json({ error: 'Apenas candidatos podem se candidatar a vagas.' });
+    }
+
     // Verifica se já existe candidatura para essa vaga/usuário
     const existente = await Candidatura.findOne({ where: { vagaId, usuarioId } });
     if (existente) {
@@ -16,6 +20,10 @@ exports.criar = async (req, res) => {
     const vaga = await Vaga.findByPk(vagaId);
     if (!vaga) {
       return res.status(404).json({ error: 'Vaga não encontrada.' });
+    }
+
+    if (vaga.empresaId && Number(vaga.empresaId) === Number(usuarioId)) {
+      return res.status(403).json({ error: 'Você não pode se candidatar à sua própria vaga.' });
     }
 
     // Verificar se a vaga está aberta para candidaturas

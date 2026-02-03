@@ -84,6 +84,7 @@ const toPublicUser = (req, u) => {
     updatedAt: raw.updatedAt,
     perfil: raw.tipo === 'empresa'
       ? {
+          capa: toAbsolute(req, raw.capa),
           logo: toAbsolute(req, raw.logo),
           setor: raw.setor || null,
           tamanho: raw.tamanho || null,
@@ -93,6 +94,7 @@ const toPublicUser = (req, u) => {
         }
       : {
           foto: toAbsolute(req, raw.foto),
+          capa: toAbsolute(req, raw.capa),
           bio: raw.bio || null,
           experiencia: raw.experiencia || null,
           formacao: raw.formacao || null,

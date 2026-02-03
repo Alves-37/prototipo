@@ -103,6 +103,18 @@ exports.request = async (req, res) => {
           lida: notif.lida,
           createdAt: notif.createdAt,
         });
+
+        io.to(`user:${me}`).emit('connection:update', {
+          targetId: other,
+          status: 'pending_outgoing',
+          requestId: conn.id,
+        });
+
+        io.to(`user:${other}`).emit('connection:update', {
+          targetId: me,
+          status: 'pending_incoming',
+          requestId: conn.id,
+        });
       }
     } catch (e) {
       console.error('Falha ao criar/emitir notificação de conexão (pedido):', e);
@@ -177,6 +189,18 @@ exports.accept = async (req, res) => {
           lida: notif.lida,
           createdAt: notif.createdAt,
         });
+
+        io.to(`user:${requesterId}`).emit('connection:update', {
+          targetId: me,
+          status: 'connected',
+          requestId: conn.id,
+        });
+
+        io.to(`user:${me}`).emit('connection:update', {
+          targetId: requesterId,
+          status: 'connected',
+          requestId: conn.id,
+        });
       }
     } catch (e) {
       console.error('Falha ao criar/emitir notificação de conexão (aceite):', e);
@@ -201,6 +225,25 @@ exports.reject = async (req, res) => {
     if (conn.status !== 'pending') return res.status(400).json({ error: 'Solicitação não está pendente' });
 
     await conn.update({ status: 'rejected' });
+
+    try {
+      const io = req.app && req.app.get ? req.app.get('io') : null;
+      if (io) {
+        io.to(`user:${conn.requesterId}`).emit('connection:update', {
+          targetId: me,
+          status: 'none',
+          requestId: conn.id,
+        });
+        io.to(`user:${me}`).emit('connection:update', {
+          targetId: conn.requesterId,
+          status: 'none',
+          requestId: conn.id,
+        });
+      }
+    } catch (e) {
+      console.error('Falha ao emitir connection:update (reject):', e);
+    }
+
     return res.json({ status: 'none' });
   } catch (err) {
     console.error('Erro ao rejeitar conexão:', err);
@@ -238,6 +281,16 @@ exports.remove = async (req, res) => {
 
     for (const c of toDisconnect) {
       await c.update({ status: 'canceled' });
+    }
+
+    try {
+      const io = req.app && req.app.get ? req.app.get('io') : null;
+      if (io) {
+        io.to(`user:${me}`).emit('connection:update', { targetId: other, status: 'none' });
+        io.to(`user:${other}`).emit('connection:update', { targetId: me, status: 'none' });
+      }
+    } catch (e) {
+      console.error('Falha ao emitir connection:update (remove):', e);
     }
 
     return res.json({ status: 'none' });

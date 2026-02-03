@@ -39,6 +39,7 @@ const User = sequelize.define('User', {
   cvData: DataTypes.TEXT, // dados do arquivo CV em base64
   dataNascimento: DataTypes.DATE,
   foto: DataTypes.TEXT, // Mudado para TEXT para suportar base64
+  capa: DataTypes.TEXT,
   
   // Redes sociais para candidato
   linkedin: DataTypes.STRING,

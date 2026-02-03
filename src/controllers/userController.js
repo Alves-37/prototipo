@@ -48,6 +48,7 @@ const filtrarCamposUsuario = (user) => {
       perfil: {
         telefone: userData.telefone,
         endereco: userData.endereco,
+        capa: userData.capa,
         logo: userData.logo,
         descricao: userData.descricao,
         setor: userData.setor,
@@ -88,6 +89,7 @@ const filtrarCamposUsuario = (user) => {
         cvData: userData.cvData,
         dataNascimento: userData.dataNascimento,
         foto: userData.foto,
+        capa: userData.capa,
         linkedin: userData.linkedin,
         github: userData.github,
         portfolio: userData.portfolio,
@@ -182,6 +184,7 @@ exports.atualizar = async (req, res) => {
         }
       }
       setIfProvided('foto', perfil.foto);
+      setIfProvided('capa', perfil.capa);
       
       // Redes sociais
       setIfProvided('linkedin', perfil.linkedin);

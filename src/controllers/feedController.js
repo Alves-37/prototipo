@@ -209,12 +209,22 @@ exports.getFeed = async (req, res) => {
         items.push({
           type: 'post',
           id: raw.id,
+          userId: raw.userId,
           createdAt: raw.createdAt,
           dataPublicacao: raw.createdAt,
           nome: author?.nome || 'Usuário',
           texto: raw.texto,
           imageUrl: toAbsolute(req, raw.imageUrl),
           avatarUrl,
+          author: author
+            ? {
+                id: author.id,
+                nome: author.nome,
+                tipo: author.tipo,
+                foto: toAbsolute(req, author.foto),
+                logo: toAbsolute(req, author.logo),
+              }
+            : null,
           likedByMe: req.user ? myLikedSet.has(String(raw.id)) : false,
           counts: {
             likes: reactionMap[String(raw.id)] || 0,
@@ -343,7 +353,7 @@ exports.getFeed = async (req, res) => {
 
     if (shouldIncludePessoas) {
       const userWhere = {
-        tipo: 'usuario',
+        tipo: { [Op.ne]: 'empresa' },
         ...(query
           ? {
               nome: { [Op.like]: `%${query}%` },
@@ -423,11 +433,27 @@ exports.getPublicUserById = async (req, res) => {
       },
     });
 
+    const followersCount = await Connection.count({
+      where: {
+        status: 'accepted',
+        addresseeId: userId,
+      },
+    });
+
+    const followingCount = await Connection.count({
+      where: {
+        status: 'accepted',
+        requesterId: userId,
+      },
+    });
+
     return res.json({
       ...pub,
       stats: {
         posts: postsCount,
         connections: connectionsCount,
+        followers: followersCount,
+        following: followingCount,
       },
     });
   } catch (err) {

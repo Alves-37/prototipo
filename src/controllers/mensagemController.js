@@ -155,11 +155,12 @@ exports.obterMensagens = async (req, res) => {
     );
 
     if (mensagensParaMarcar.length > 0) {
+      const idsMarcadas = mensagensParaMarcar.map(m => m.id);
       await Mensagem.update(
         { lida: true },
         { 
           where: { 
-            id: { [Op.in]: mensagensParaMarcar.map(m => m.id) }
+            id: { [Op.in]: idsMarcadas }
           }
         }
       );
@@ -169,6 +170,19 @@ exports.obterMensagens = async (req, res) => {
       await conversa.update({
         [campoNaoLidas]: 0
       });
+
+      try {
+        const io = req.app && req.app.get ? req.app.get('io') : null;
+        if (io) {
+          const otherUserId = conversa.usuario1Id === userId ? conversa.usuario2Id : conversa.usuario1Id;
+          io.to(`user:${otherUserId}`).emit('message:status', {
+            conversaId,
+            messageIds: idsMarcadas,
+            lida: true,
+            at: Date.now(),
+          });
+        }
+      } catch {}
     }
 
     // Formatar mensagens para o frontend
@@ -247,6 +261,18 @@ exports.enviarMensagem = async (req, res) => {
       ]
     });
 
+    let entregueAgora = false;
+    try {
+      const onlineUsers = req.app && req.app.get ? req.app.get('onlineUsers') : null;
+      entregueAgora = !!(onlineUsers && typeof onlineUsers.has === 'function' && onlineUsers.has(String(destinatarioId)));
+      if (entregueAgora) {
+        await Mensagem.update(
+          { entregue: true },
+          { where: { id: mensagemCompleta.id, entregue: false } }
+        );
+      }
+    } catch {}
+
     // Formatar resposta
     const mensagemFormatada = {
       id: mensagemCompleta.id,
@@ -261,7 +287,7 @@ exports.enviarMensagem = async (req, res) => {
       arquivo: mensagemCompleta.arquivo,
       lida: false,
       enviada: true,
-      entregue: false
+      entregue: entregueAgora
     };
 
     try {
@@ -274,6 +300,16 @@ exports.enviarMensagem = async (req, res) => {
         };
         io.to(`user:${remetenteId}`).emit('message:new', payload);
         io.to(`user:${destinatarioId}`).emit('message:new', payload);
+
+        if (entregueAgora) {
+          io.to(`user:${remetenteId}`).emit('message:status', {
+            conversaId: conversa.conversaId,
+            messageId: mensagemCompleta.id,
+            entregue: true,
+            lida: false,
+            at: Date.now(),
+          });
+        }
       }
     } catch (e) {
       console.error('Erro ao emitir mensagem via socket:', e);
@@ -306,7 +342,7 @@ exports.marcarComoLidas = async (req, res) => {
     }
 
     // Marcar mensagens como lidas
-    await Mensagem.update(
+    const [affected] = await Mensagem.update(
       { lida: true },
       { 
         where: { 
@@ -322,6 +358,20 @@ exports.marcarComoLidas = async (req, res) => {
     await conversa.update({
       [campoNaoLidas]: 0
     });
+
+    if (affected && Number(affected) > 0) {
+      try {
+        const io = req.app && req.app.get ? req.app.get('io') : null;
+        if (io) {
+          const otherUserId = conversa.usuario1Id === userId ? conversa.usuario2Id : conversa.usuario1Id;
+          io.to(`user:${otherUserId}`).emit('message:status', {
+            conversaId,
+            lida: true,
+            at: Date.now(),
+          });
+        }
+      } catch {}
+    }
 
     res.json({ success: true });
   } catch (error) {
@@ -452,17 +502,27 @@ exports.buscarUsuarios = async (req, res) => {
 
     const usuarios = await User.findAll({
       where: whereClause,
-      attributes: ['id', 'nome', 'email', 'tipo', 'foto', 'logo', 'telefone', 'localizacao', 'profissao', 'setor', 'updatedAt'],
+      attributes: ['id', 'nome', 'email', 'tipo', 'foto', 'logo', 'telefone', 'updatedAt'],
       limit: 20
     });
 
     const onlineUsers = req.app && req.app.get ? req.app.get('onlineUsers') : null;
+    const lastSeenByUserId = req.app && req.app.get ? req.app.get('lastSeenByUserId') : null;
     const isOnline = (id) => {
       try {
         if (!onlineUsers || typeof onlineUsers.has !== 'function') return false;
         return onlineUsers.has(String(id));
       } catch {
         return false;
+      }
+    };
+
+    const getLastSeenAt = (id) => {
+      try {
+        if (!lastSeenByUserId || typeof lastSeenByUserId.get !== 'function') return null;
+        return lastSeenByUserId.get(String(id)) || null;
+      } catch {
+        return null;
       }
     };
 
@@ -483,11 +543,9 @@ exports.buscarUsuarios = async (req, res) => {
       tipo: usuario.tipo,
       foto: toAbsolute(usuario.foto || usuario.logo),
       telefone: usuario.telefone || '',
-      localizacao: usuario.localizacao || '',
-      profissao: usuario.profissao || '',
-      setor: usuario.setor || '',
       ultimaAtividade: usuario.updatedAt ? new Date(usuario.updatedAt).toLocaleString('pt-BR') : 'Nunca',
-      online: isOnline(usuario.id)
+      online: isOnline(usuario.id),
+      lastSeenAt: getLastSeenAt(usuario.id)
     }));
 
     res.json(usuariosFormatados);

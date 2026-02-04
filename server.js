@@ -10,6 +10,7 @@ let server;
 let io;
 
 const onlineUsers = new Set();
+const lastSeenByUserId = new Map();
 
 // Sincronizar banco e iniciar servidor
 syncDb().then(() => {
@@ -24,6 +25,7 @@ syncDb().then(() => {
 
   app.set('io', io);
   app.set('onlineUsers', onlineUsers);
+  app.set('lastSeenByUserId', lastSeenByUserId);
 
   const JWT_SECRET = process.env.JWT_SECRET || 'umsegredoseguro';
 
@@ -61,17 +63,37 @@ syncDb().then(() => {
         } catch {}
 
         try {
-          io.emit('presence:update', { userId: socket.userId, online: true, at: Date.now() });
+          io.emit('presence:update', { userId: socket.userId, online: true, at: Date.now(), lastSeenAt: null });
         } catch {}
       }
     } catch {}
+
+    socket.on('typing', (evt) => {
+      try {
+        if (!socket.userId) return;
+        const toUserId = evt?.toUserId;
+        const conversaId = evt?.conversaId;
+        if (toUserId === undefined || toUserId === null) return;
+        io.to(`user:${toUserId}`).emit('typing', {
+          fromUserId: socket.userId,
+          toUserId,
+          conversaId,
+          typing: !!evt?.typing,
+          at: Date.now(),
+        });
+      } catch {}
+    });
 
     socket.on('disconnect', () => {
       try {
         if (!socket.userId) return;
         onlineUsers.delete(String(socket.userId));
         try {
-          io.emit('presence:update', { userId: socket.userId, online: false, at: Date.now() });
+          lastSeenByUserId.set(String(socket.userId), Date.now());
+        } catch {}
+        try {
+          const lastSeenAt = lastSeenByUserId.get(String(socket.userId)) || Date.now();
+          io.emit('presence:update', { userId: socket.userId, online: false, at: Date.now(), lastSeenAt });
         } catch {}
       } catch {}
     });

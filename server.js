@@ -4,6 +4,8 @@ const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const app = require('./src/app');
 const { syncDb, sequelize } = require('./src/models');
+const { Op } = require('sequelize');
+const { Mensagem } = require('./src/models');
 
 const PORT = process.env.PORT || 5000;
 let server;
@@ -58,6 +60,60 @@ syncDb().then(() => {
         socket.join(`user:${socket.userId}`);
 
         onlineUsers.add(String(socket.userId));
+
+        try {
+          (async () => {
+            try {
+              if (!Mensagem) return;
+              const userId = Number(socket.userId);
+              if (!userId) return;
+
+              const pendentes = await Mensagem.findAll({
+                where: {
+                  destinatarioId: userId,
+                  entregue: false,
+                },
+                attributes: ['id', 'conversaId', 'remetenteId'],
+                limit: 200,
+                order: [['createdAt', 'ASC']],
+              });
+
+              if (!pendentes || pendentes.length === 0) return;
+
+              const ids = pendentes.map(m => m.id);
+              await Mensagem.update(
+                { entregue: true },
+                { where: { id: { [Op.in]: ids } } }
+              );
+
+              const grouped = new Map();
+              pendentes.forEach((m) => {
+                const remetenteId = Number(m?.remetenteId);
+                const conversaId = String(m?.conversaId || '');
+                if (!remetenteId || !conversaId) return;
+                const key = `${remetenteId}::${conversaId}`;
+                const arr = grouped.get(key) || [];
+                arr.push(m.id);
+                grouped.set(key, arr);
+              });
+
+              grouped.forEach((messageIds, key) => {
+                try {
+                  const [remetenteIdStr, conversaId] = String(key).split('::');
+                  const remetenteId = Number(remetenteIdStr);
+                  if (!remetenteId || !conversaId) return;
+                  io.to(`user:${remetenteId}`).emit('message:status', {
+                    conversaId,
+                    messageIds,
+                    entregue: true,
+                    at: Date.now(),
+                  });
+                } catch {}
+              });
+            } catch {}
+          })();
+        } catch {}
+
         try {
           socket.emit('presence:state', { onlineUserIds: Array.from(onlineUsers) });
         } catch {}

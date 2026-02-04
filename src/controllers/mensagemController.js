@@ -32,8 +32,8 @@ const obterOuCriarConversa = async (userId1, userId2, vagaId = null) => {
     conversa = await Conversa.findOne({
       where: { conversaId },
       include: [
-        { model: User, as: 'usuario1', attributes: ['id', 'nome', 'email', 'tipo', 'foto'] },
-        { model: User, as: 'usuario2', attributes: ['id', 'nome', 'email', 'tipo', 'foto'] },
+        { model: User, as: 'usuario1', attributes: ['id', 'nome', 'email', 'tipo', 'foto', 'logo'] },
+        { model: User, as: 'usuario2', attributes: ['id', 'nome', 'email', 'tipo', 'foto', 'logo'] },
         { model: Vaga, as: 'vaga', attributes: ['id', 'titulo'] }
       ]
     });
@@ -56,8 +56,8 @@ exports.listarConversas = async (req, res) => {
         ativa: true
       },
       include: [
-        { model: User, as: 'usuario1', attributes: ['id', 'nome', 'email', 'tipo', 'foto'] },
-        { model: User, as: 'usuario2', attributes: ['id', 'nome', 'email', 'tipo', 'foto'] },
+        { model: User, as: 'usuario1', attributes: ['id', 'nome', 'email', 'tipo', 'foto', 'logo'] },
+        { model: User, as: 'usuario2', attributes: ['id', 'nome', 'email', 'tipo', 'foto', 'logo'] },
         { model: Vaga, as: 'vaga', attributes: ['id', 'titulo'] }
       ],
       order: [['ultimaMensagemData', 'DESC']]
@@ -126,8 +126,8 @@ exports.obterMensagens = async (req, res) => {
     const conversa = await Conversa.findOne({
       where: { conversaId },
       include: [
-        { model: User, as: 'usuario1', attributes: ['id', 'nome', 'email', 'tipo', 'foto'] },
-        { model: User, as: 'usuario2', attributes: ['id', 'nome', 'email', 'tipo', 'foto'] }
+        { model: User, as: 'usuario1', attributes: ['id', 'nome', 'email', 'tipo', 'foto', 'logo'] },
+        { model: User, as: 'usuario2', attributes: ['id', 'nome', 'email', 'tipo', 'foto', 'logo'] }
       ]
     });
 

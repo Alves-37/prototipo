@@ -9,6 +9,8 @@ const PORT = process.env.PORT || 5000;
 let server;
 let io;
 
+const onlineUsers = new Set();
+
 // Sincronizar banco e iniciar servidor
 syncDb().then(() => {
   server = http.createServer(app);
@@ -51,9 +53,27 @@ syncDb().then(() => {
     try {
       if (socket.userId) {
         socket.join(`user:${socket.userId}`);
+
+        onlineUsers.add(String(socket.userId));
+        try {
+          socket.emit('presence:state', { onlineUserIds: Array.from(onlineUsers) });
+        } catch {}
+
+        try {
+          io.emit('presence:update', { userId: socket.userId, online: true, at: Date.now() });
+        } catch {}
       }
     } catch {}
-    socket.on('disconnect', () => {});
+
+    socket.on('disconnect', () => {
+      try {
+        if (!socket.userId) return;
+        onlineUsers.delete(String(socket.userId));
+        try {
+          io.emit('presence:update', { userId: socket.userId, online: false, at: Date.now() });
+        } catch {}
+      } catch {}
+    });
   });
 
   server.listen(PORT, () => {

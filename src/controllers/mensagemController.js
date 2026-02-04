@@ -7,6 +7,126 @@ const gerarConversaId = (userId1, userId2, vagaId = null) => {
   return vagaId ? `${ids[0]}_${ids[1]}_${vagaId}` : `${ids[0]}_${ids[1]}`;
 };
 
+// Editar mensagem
+exports.editarMensagem = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { id } = req.params;
+    const { texto } = req.body || {};
+
+    if (!texto || !String(texto).trim()) {
+      return res.status(400).json({ error: 'Texto é obrigatório' });
+    }
+
+    const mensagem = await Mensagem.findByPk(id);
+    if (!mensagem) {
+      return res.status(404).json({ error: 'Mensagem não encontrada' });
+    }
+
+    if (mensagem.remetenteId !== userId) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+
+    if (mensagem.apagadaParaTodos) {
+      return res.status(400).json({ error: 'Não é possível editar uma mensagem apagada' });
+    }
+
+    await mensagem.update({
+      texto: String(texto).trim(),
+      editada: true,
+      editadaEm: new Date(),
+    });
+
+    try {
+      const io = req.app && req.app.get ? req.app.get('io') : null;
+      if (io) {
+        const payload = {
+          conversaId: mensagem.conversaId,
+          mensagem: {
+            id: mensagem.id,
+            texto: mensagem.texto,
+            editada: true,
+            editadaEm: mensagem.editadaEm ? mensagem.editadaEm.getTime() : Date.now(),
+            apagadaParaTodos: !!mensagem.apagadaParaTodos,
+          },
+          at: Date.now(),
+        };
+        io.to(`user:${mensagem.remetenteId}`).emit('message:update', payload);
+        io.to(`user:${mensagem.destinatarioId}`).emit('message:update', payload);
+      }
+    } catch {}
+
+    res.json({
+      id: mensagem.id,
+      conversaId: mensagem.conversaId,
+      texto: mensagem.texto,
+      editada: true,
+      editadaEm: mensagem.editadaEm ? mensagem.editadaEm.getTime() : null,
+    });
+  } catch (error) {
+    console.error('Erro ao editar mensagem:', error);
+    res.status(500).json({ error: 'Erro ao editar mensagem' });
+  }
+};
+
+// Apagar mensagem (para mim / para todos)
+exports.apagarMensagem = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { id } = req.params;
+    const scope = String(req.query?.scope || 'me').toLowerCase();
+
+    const mensagem = await Mensagem.findByPk(id);
+    if (!mensagem) {
+      return res.status(404).json({ error: 'Mensagem não encontrada' });
+    }
+
+    const participa = mensagem.remetenteId === userId || mensagem.destinatarioId === userId;
+    if (!participa) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+
+    if (scope === 'all') {
+      if (mensagem.remetenteId !== userId) {
+        return res.status(403).json({ error: 'Só o remetente pode apagar para todos' });
+      }
+
+      await mensagem.update({
+        apagadaParaTodos: true,
+        apagadaEm: new Date(),
+        texto: 'Mensagem apagada',
+        tipo: 'sistema',
+        arquivo: null,
+      });
+
+      try {
+        const io = req.app && req.app.get ? req.app.get('io') : null;
+        if (io) {
+          const payload = {
+            conversaId: mensagem.conversaId,
+            messageId: mensagem.id,
+            scope: 'all',
+            at: Date.now(),
+          };
+          io.to(`user:${mensagem.remetenteId}`).emit('message:delete', payload);
+          io.to(`user:${mensagem.destinatarioId}`).emit('message:delete', payload);
+        }
+      } catch {}
+
+      return res.json({ success: true, scope: 'all' });
+    }
+
+    const ocultoParaAtual = Array.isArray(mensagem.ocultoPara) ? mensagem.ocultoPara : [];
+    const nextOculto = Array.from(new Set([...ocultoParaAtual.map(x => String(x)), String(userId)])).map(x => Number(x));
+    await mensagem.update({ ocultoPara: nextOculto });
+
+    return res.json({ success: true, scope: 'me' });
+  } catch (error) {
+    console.error('Erro ao apagar mensagem:', error);
+    res.status(500).json({ error: 'Erro ao apagar mensagem' });
+  }
+};
+
 // Função para obter ou criar conversa
 const obterOuCriarConversa = async (userId1, userId2, vagaId = null) => {
   const conversaId = gerarConversaId(userId1, userId2, vagaId);
@@ -149,8 +269,17 @@ exports.obterMensagens = async (req, res) => {
       order: [['createdAt', 'ASC']]
     });
 
+    const mensagensVisiveis = (mensagens || []).filter((m) => {
+      try {
+        const ocultoPara = Array.isArray(m?.ocultoPara) ? m.ocultoPara : []
+        return !ocultoPara.map(x => String(x)).includes(String(userId))
+      } catch {
+        return true
+      }
+    })
+
     // Marcar mensagens como lidas
-    const mensagensParaMarcar = mensagens.filter(msg => 
+    const mensagensParaMarcar = mensagensVisiveis.filter(msg => 
       msg.destinatarioId === userId && !msg.lida
     );
 
@@ -186,19 +315,22 @@ exports.obterMensagens = async (req, res) => {
     }
 
     // Formatar mensagens para o frontend
-    const mensagensFormatadas = mensagens.map(msg => ({
+    const mensagensFormatadas = mensagensVisiveis.map(msg => ({
       id: msg.id,
       remetente: msg.remetenteId === userId ? (req.user.tipo === 'empresa' ? 'empresa' : 'candidato') : 
                 (msg.remetente.tipo === 'empresa' ? 'empresa' : 'candidato'),
       remetenteId: msg.remetenteId,
       destinatarioId: msg.destinatarioId,
-      texto: msg.texto,
+      texto: msg.apagadaParaTodos ? 'Mensagem apagada' : msg.texto,
       data: msg.createdAt.toLocaleString('pt-BR'),
-      tipo: msg.tipo,
-      arquivo: msg.arquivo,
+      tipo: msg.apagadaParaTodos ? 'sistema' : msg.tipo,
+      arquivo: msg.apagadaParaTodos ? null : msg.arquivo,
       lida: msg.lida,
       enviada: msg.enviada,
-      entregue: msg.entregue
+      entregue: msg.entregue,
+      editada: !!msg.editada,
+      editadaEm: msg.editadaEm ? msg.editadaEm.getTime() : null,
+      apagadaParaTodos: !!msg.apagadaParaTodos
     }));
 
     res.json(mensagensFormatadas);
@@ -287,7 +419,10 @@ exports.enviarMensagem = async (req, res) => {
       arquivo: mensagemCompleta.arquivo,
       lida: false,
       enviada: true,
-      entregue: entregueAgora
+      entregue: entregueAgora,
+      editada: false,
+      editadaEm: null,
+      apagadaParaTodos: false
     };
 
     try {

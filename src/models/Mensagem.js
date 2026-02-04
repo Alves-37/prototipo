@@ -47,6 +47,27 @@ const Mensagem = sequelize.define('Mensagem', {
     type: DataTypes.BOOLEAN,
     defaultValue: false
   },
+  editada: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
+  editadaEm: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  apagadaParaTodos: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
+  apagadaEm: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  ocultoPara: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: []
+  },
   vagaId: {
     type: DataTypes.INTEGER,
     allowNull: true,

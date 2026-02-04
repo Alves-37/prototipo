@@ -15,6 +15,12 @@ router.get('/conversa/:conversaId', mensagemController.obterMensagens);
 // Enviar mensagem
 router.post('/enviar', mensagemController.enviarMensagem);
 
+// Editar mensagem
+router.put('/mensagem/:id', mensagemController.editarMensagem);
+
+// Apagar mensagem (scope=me|all)
+router.delete('/mensagem/:id', mensagemController.apagarMensagem);
+
 // Marcar mensagens como lidas
 router.put('/conversa/:conversaId/lidas', mensagemController.marcarComoLidas);
 

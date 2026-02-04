@@ -374,14 +374,32 @@ exports.obterMensagens = async (req, res) => {
     }
 
     // Buscar mensagens
-    const mensagens = await Mensagem.findAll({
-      where: { conversaId },
-      include: [
-        { model: User, as: 'remetente', attributes: ['id', 'nome', 'foto'] },
-        { model: User, as: 'destinatario', attributes: ['id', 'nome', 'foto'] }
-      ],
-      order: [['createdAt', 'ASC']]
-    });
+    let mensagens = null;
+    try {
+      mensagens = await Mensagem.findAll({
+        where: { conversaId },
+        include: [
+          { model: User, as: 'remetente', attributes: ['id', 'nome', 'foto'] },
+          { model: User, as: 'destinatario', attributes: ['id', 'nome', 'foto'] }
+        ],
+        order: [['createdAt', 'ASC']]
+      });
+    } catch (e) {
+      const msg = String(e?.message || '')
+      const isUnknownColumn = msg.toLowerCase().includes('unknown column') || msg.toLowerCase().includes('does not exist')
+      if (!isUnknownColumn) throw e
+
+      // Fallback para banco antigo (produção sem alter): seleciona apenas colunas antigas
+      mensagens = await Mensagem.findAll({
+        where: { conversaId },
+        attributes: ['id', 'remetenteId', 'destinatarioId', 'texto', 'tipo', 'arquivo', 'lida', 'enviada', 'entregue', 'vagaId', 'conversaId', 'createdAt'],
+        include: [
+          { model: User, as: 'remetente', attributes: ['id', 'nome', 'foto'] },
+          { model: User, as: 'destinatario', attributes: ['id', 'nome', 'foto'] }
+        ],
+        order: [['createdAt', 'ASC']]
+      });
+    }
 
     const mensagensVisiveis = (mensagens || []).filter((m) => {
       try {

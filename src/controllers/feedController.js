@@ -140,6 +140,7 @@ exports.getFeed = async (req, res) => {
 
     const shouldIncludeVagas = tab === 'todos' || tab === 'vagas';
     const shouldIncludePessoas = tab === 'pessoas';
+    const shouldIncludeEmpresas = tab === 'empresas';
     const shouldIncludeServicos = tab === 'servicos';
     const shouldIncludePosts = tab === 'todos' || tab === 'posts' || tab === 'postagens';
 
@@ -232,6 +233,38 @@ exports.getFeed = async (req, res) => {
             likes: reactionMap[String(raw.id)] || 0,
             comments: commentMap[String(raw.id)] || 0,
           },
+        });
+      }
+    }
+
+    if (shouldIncludeEmpresas) {
+      const companyWhere = {
+        tipo: 'empresa',
+        ...(query
+          ? {
+              nome: { [Op.like]: `%${query}%` },
+            }
+          : {}),
+      };
+
+      const companies = await User.findAll({
+        where: companyWhere,
+        order: [['createdAt', 'DESC']],
+        limit: limitNum,
+        offset,
+      });
+
+      for (const u of companies) {
+        const pub = toPublicUser(req, u);
+        if (!pub) continue;
+
+        items.push({
+          type: 'empresa',
+          id: pub.id,
+          createdAt: pub.createdAt,
+          nome: pub.nome,
+          perfil: pub.perfil,
+          avatarUrl: pub.perfil?.logo,
         });
       }
     }

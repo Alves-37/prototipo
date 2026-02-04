@@ -23,6 +23,7 @@ syncDb().then(() => {
   });
 
   app.set('io', io);
+  app.set('onlineUsers', onlineUsers);
 
   const JWT_SECRET = process.env.JWT_SECRET || 'umsegredoseguro';
 

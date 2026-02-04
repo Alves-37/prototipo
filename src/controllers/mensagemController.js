@@ -264,6 +264,21 @@ exports.enviarMensagem = async (req, res) => {
       entregue: false
     };
 
+    try {
+      const io = req.app && req.app.get ? req.app.get('io') : null;
+      if (io) {
+        const payload = {
+          conversaId: conversa.conversaId,
+          mensagem: mensagemFormatada,
+          at: Date.now(),
+        };
+        io.to(`user:${remetenteId}`).emit('message:new', payload);
+        io.to(`user:${destinatarioId}`).emit('message:new', payload);
+      }
+    } catch (e) {
+      console.error('Erro ao emitir mensagem via socket:', e);
+    }
+
     res.status(201).json(mensagemFormatada);
   } catch (error) {
     console.error('Erro ao enviar mensagem:', error);
@@ -437,9 +452,19 @@ exports.buscarUsuarios = async (req, res) => {
 
     const usuarios = await User.findAll({
       where: whereClause,
-      attributes: ['id', 'nome', 'email', 'tipo', 'foto', 'logo', 'telefone'],
+      attributes: ['id', 'nome', 'email', 'tipo', 'foto', 'logo', 'telefone', 'localizacao', 'profissao', 'setor', 'updatedAt'],
       limit: 20
     });
+
+    const onlineUsers = req.app && req.app.get ? req.app.get('onlineUsers') : null;
+    const isOnline = (id) => {
+      try {
+        if (!onlineUsers || typeof onlineUsers.has !== 'function') return false;
+        return onlineUsers.has(String(id));
+      } catch {
+        return false;
+      }
+    };
 
     // Formatar dados
     const baseUrl = `${req.protocol}://${req.get('host')}`;
@@ -461,8 +486,8 @@ exports.buscarUsuarios = async (req, res) => {
       localizacao: usuario.localizacao || '',
       profissao: usuario.profissao || '',
       setor: usuario.setor || '',
-      ultimaAtividade: 'Online',
-      online: true
+      ultimaAtividade: usuario.updatedAt ? new Date(usuario.updatedAt).toLocaleString('pt-BR') : 'Nunca',
+      online: isOnline(usuario.id)
     }));
 
     res.json(usuariosFormatados);

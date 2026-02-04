@@ -30,13 +30,21 @@ const fileFilter = (req, file, cb) => {
     'image/jpeg',
     'image/jpg',
     'image/png',
-    'image/webp'
+    'image/webp',
+    // Áudio
+    'audio/mpeg',
+    'audio/mp3',
+    'audio/wav',
+    'audio/webm',
+    'audio/ogg',
+    'audio/aac',
+    'audio/mp4'
   ];
   
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Tipo de arquivo não permitido. Apenas PDF, DOC, DOCX, JPG, PNG e WebP são aceitos.'), false);
+    cb(new Error('Tipo de arquivo não permitido. Apenas PDF, DOC, DOCX, JPG, PNG, WebP e áudios comuns são aceitos.'), false);
   }
 };
 

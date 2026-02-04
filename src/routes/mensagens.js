@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mensagemController = require('../controllers/mensagemController');
 const { authMiddleware } = require('../middlewares/auth');
+const { upload } = require('../middlewares/upload');
 
 // Todas as rotas requerem autenticação
 router.use(authMiddleware);
@@ -14,6 +15,9 @@ router.get('/conversa/:conversaId', mensagemController.obterMensagens);
 
 // Enviar mensagem
 router.post('/enviar', mensagemController.enviarMensagem);
+
+// Enviar anexo (multipart)
+router.post('/enviar-anexo', upload.single('arquivo'), mensagemController.enviarAnexo);
 
 // Editar mensagem
 router.put('/mensagem/:id', mensagemController.editarMensagem);

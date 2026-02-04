@@ -101,9 +101,16 @@ Connection.belongsTo(User, { foreignKey: 'addresseeId', as: 'addressee' });
 const syncDb = async () => {
   try {
     if (process.env.NODE_ENV === 'production') {
-      console.log('NODE_ENV=production -> Executando sequelize.sync() SEM alter/force');
-      await sequelize.sync();
-      console.log('Banco de dados sincronizado (produção, sem alterações destrutivas)');
+      const allowAlter = String(process.env.DB_SYNC_ALTER || '').toLowerCase() === 'true';
+      if (allowAlter) {
+        console.log('NODE_ENV=production && DB_SYNC_ALTER=true -> Executando sequelize.sync({ alter: true })');
+        await sequelize.sync({ alter: true });
+        console.log('Banco de dados sincronizado (produção, alter=true)');
+      } else {
+        console.log('NODE_ENV=production -> Executando sequelize.sync() SEM alter/force');
+        await sequelize.sync();
+        console.log('Banco de dados sincronizado (produção, sem alterações destrutivas)');
+      }
       return;
     }
 

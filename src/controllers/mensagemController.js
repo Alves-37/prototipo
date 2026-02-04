@@ -7,6 +7,120 @@ const gerarConversaId = (userId1, userId2, vagaId = null) => {
   return vagaId ? `${ids[0]}_${ids[1]}_${vagaId}` : `${ids[0]}_${ids[1]}`;
 };
 
+// Enviar anexo (multipart)
+exports.enviarAnexo = async (req, res) => {
+  try {
+    const remetenteId = req.user.id;
+    const { destinatarioId, vagaId = null } = req.body || {};
+
+    if (!destinatarioId) {
+      return res.status(400).json({ error: 'Destinatário é obrigatório' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'Arquivo é obrigatório' });
+    }
+
+    const destinatario = await User.findByPk(destinatarioId);
+    if (!destinatario) {
+      return res.status(404).json({ error: 'Destinatário não encontrado' });
+    }
+
+    const conversa = await obterOuCriarConversa(remetenteId, Number(destinatarioId), vagaId);
+
+    const campoBloqueada = conversa.usuario1Id === remetenteId ? 'bloqueada1' : 'bloqueada2';
+    if (conversa[campoBloqueada]) {
+      return res.status(403).json({ error: 'Conversa bloqueada' });
+    }
+
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const publicPath = `/uploads/${req.file.filename}`;
+    const url = `${baseUrl}${publicPath}`;
+
+    const mimetype = String(req.file.mimetype || '').toLowerCase();
+    let tipo = 'arquivo';
+    if (mimetype.startsWith('image/')) tipo = 'imagem';
+    if (mimetype.startsWith('audio/')) tipo = 'arquivo';
+
+    const arquivoInfo = {
+      url,
+      path: publicPath,
+      filename: req.file.filename,
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+    };
+
+    const texto = tipo === 'imagem'
+      ? '[Imagem]'
+      : (mimetype.startsWith('audio/') ? '[Áudio]' : `[Arquivo] ${req.file.originalname}`);
+
+    const mensagem = await Mensagem.create({
+      remetenteId,
+      destinatarioId: Number(destinatarioId),
+      texto,
+      tipo,
+      arquivo: arquivoInfo,
+      conversaId: conversa.conversaId,
+      vagaId,
+    });
+
+    const campoNaoLidas = conversa.usuario1Id === Number(destinatarioId) ? 'mensagensNaoLidas1' : 'mensagensNaoLidas2';
+    await conversa.update({
+      ultimaMensagem: texto,
+      ultimaMensagemData: new Date(),
+      [campoNaoLidas]: conversa[campoNaoLidas] + 1,
+    });
+
+    let entregueAgora = false;
+    try {
+      const onlineUsers = req.app && req.app.get ? req.app.get('onlineUsers') : null;
+      entregueAgora = !!(onlineUsers && typeof onlineUsers.has === 'function' && onlineUsers.has(String(destinatarioId)));
+      if (entregueAgora) {
+        await Mensagem.update(
+          { entregue: true },
+          { where: { id: mensagem.id, entregue: false } }
+        );
+      }
+    } catch {}
+
+    const mensagemFormatada = {
+      id: mensagem.id,
+      remetente: req.user.tipo === 'empresa' ? 'empresa' : 'candidato',
+      remetenteId,
+      destinatarioId: Number(destinatarioId),
+      texto,
+      data: mensagem.createdAt.toLocaleString('pt-BR'),
+      tipo,
+      arquivo: arquivoInfo,
+      lida: false,
+      enviada: true,
+      entregue: entregueAgora,
+      editada: false,
+      editadaEm: null,
+      apagadaParaTodos: false,
+    };
+
+    try {
+      const io = req.app && req.app.get ? req.app.get('io') : null;
+      if (io) {
+        const payload = {
+          conversaId: conversa.conversaId,
+          mensagem: mensagemFormatada,
+          at: Date.now(),
+        };
+        io.to(`user:${remetenteId}`).emit('message:new', payload);
+        io.to(`user:${destinatarioId}`).emit('message:new', payload);
+      }
+    } catch {}
+
+    res.status(201).json(mensagemFormatada);
+  } catch (error) {
+    console.error('Erro ao enviar anexo:', error);
+    res.status(500).json({ error: 'Erro ao enviar anexo' });
+  }
+};
+
 // Editar mensagem
 exports.editarMensagem = async (req, res) => {
   try {

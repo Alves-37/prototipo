@@ -1,6 +1,18 @@
 const { Mensagem, Conversa, User, Vaga } = require('../models');
 const { Op } = require('sequelize');
 
+const getPublicBaseUrl = (req) => {
+  try {
+    const xfProto = req.get('x-forwarded-proto');
+    const xfHost = req.get('x-forwarded-host');
+    const proto = xfProto ? String(xfProto).split(',')[0].trim() : req.protocol;
+    const host = xfHost ? String(xfHost).split(',')[0].trim() : req.get('host');
+    return `${proto}://${host}`;
+  } catch {
+    return `${req.protocol}://${req.get('host')}`;
+  }
+};
+
 // Função utilitária para gerar ID de conversa
 const gerarConversaId = (userId1, userId2, vagaId = null) => {
   const ids = [userId1, userId2].sort((a, b) => a - b);
@@ -33,7 +45,7 @@ exports.enviarAnexo = async (req, res) => {
       return res.status(403).json({ error: 'Conversa bloqueada' });
     }
 
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const baseUrl = getPublicBaseUrl(req);
     const publicPath = `/uploads/${req.file.filename}`;
     const url = `${baseUrl}${publicPath}`;
 
@@ -298,11 +310,10 @@ exports.listarConversas = async (req, res) => {
     });
 
     // Formatar dados para o frontend
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const baseUrl = getPublicBaseUrl(req);
     const toAbsolute = (foto) => {
       if (!foto) return 'https://via.placeholder.com/150';
       const f = String(foto);
-      // já é URL absoluta ou data URL (base64)
       if (f.startsWith('http://') || f.startsWith('https://') || f.startsWith('data:')) return f;
       // garantir que tenha uma barra inicial para caminhos relativos
       const path = f.startsWith('/') ? f : `/${f}`;
@@ -794,7 +805,7 @@ exports.buscarUsuarios = async (req, res) => {
     };
 
     // Formatar dados
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const baseUrl = getPublicBaseUrl(req);
     const toAbsolute = (foto) => {
       if (!foto) return 'https://via.placeholder.com/150';
       const f = String(foto);

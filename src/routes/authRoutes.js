@@ -2,9 +2,18 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
 const passport = require('passport');
+const rateLimit = require('express-rate-limit');
+
+const loginLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas tentativas. Tente novamente em alguns minutos.' },
+});
 
 router.post('/register', authController.register);
-router.post('/login', authController.login);
+router.post('/login', loginLimiter, authController.login);
 
 // Google OAuth (inicia fluxo) - permite passar tipo via query (?tipo=empresa|usuario)
 router.get('/google', (req, res, next) => {

@@ -16,6 +16,7 @@
     "migrate-capacidade": "node migrate-capacidade.js",
     "check-capacidade": "node check-capacidade.js",
     "migrate-mensagens": "node migrate-mensagens.js",
+    "migrate-mensagens-cols": "node scripts/migrate-mensagens-columns.js",
     "db:list": "node scripts/list-tables.js",
     "seed:admin": "node scripts/seed-admin.js"
   },

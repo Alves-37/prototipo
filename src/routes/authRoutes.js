@@ -12,7 +12,15 @@ const loginLimiter = rateLimit({
   message: { error: 'Muitas tentativas. Tente novamente em alguns minutos.' },
 });
 
-router.post('/register', authController.register);
+const registerLimiter = rateLimit({
+  windowMs: 30 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas tentativas. Tente novamente em alguns minutos.' },
+});
+
+router.post('/register', registerLimiter, authController.register);
 router.post('/login', loginLimiter, authController.login);
 
 // Google OAuth (inicia fluxo) - permite passar tipo via query (?tipo=empresa|usuario)

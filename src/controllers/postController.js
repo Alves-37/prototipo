@@ -1,10 +1,56 @@
 const { Post, PostReaction, PostComment, User, Notificacao } = require('../models');
 
+const getPublicBaseUrl = (req) => {
+  try {
+    const xfProto = req.get('x-forwarded-proto');
+    const xfHost = req.get('x-forwarded-host');
+    const proto = xfProto ? String(xfProto).split(',')[0].trim() : req.protocol;
+    const host = xfHost ? String(xfHost).split(',')[0].trim() : req.get('host');
+    return `${proto}://${host}`;
+  } catch {
+    return `${req.protocol}://${req.get('host')}`;
+  }
+};
+
+const basicModerateText = (input) => {
+  const text = typeof input === 'string' ? input.trim() : '';
+  if (!text) return { ok: true, value: '' };
+
+  const lowered = text.toLowerCase();
+  const banned = [
+    'porn',
+    'porno',
+    'pornografia',
+    'nude',
+    'nudes',
+    'sexo',
+    'conteúdo adulto',
+    'conteudo adulto',
+    'racista',
+    'nazista',
+    'ódio',
+    'odio',
+  ];
+
+  for (const w of banned) {
+    if (lowered.includes(w)) {
+      return { ok: false, reason: 'Conteúdo não permitido' };
+    }
+  }
+
+  const linkMatches = text.match(/https?:\/\//gi) || [];
+  if (linkMatches.length > 3) {
+    return { ok: false, reason: 'Muitos links na publicação' };
+  }
+
+  return { ok: true, value: text };
+};
+
 const toAbsolute = (req, maybePath) => {
   if (!maybePath) return null;
   const f = String(maybePath);
   if (f.startsWith('http://') || f.startsWith('https://') || f.startsWith('data:')) return f;
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const baseUrl = getPublicBaseUrl(req);
   const path = f.startsWith('/') ? f : `/${f}`;
   return `${baseUrl}${path}`;
 };
@@ -103,7 +149,11 @@ exports.create = async (req, res) => {
     const userId = req.user.id;
     const { texto, imageUrl } = req.body || {};
 
-    const t = typeof texto === 'string' ? texto.trim() : '';
+    const mod = basicModerateText(texto);
+    if (!mod.ok) {
+      return res.status(400).json({ error: mod.reason || 'Conteúdo não permitido' });
+    }
+    const t = mod.value;
     const img = typeof imageUrl === 'string' ? imageUrl.trim() : '';
 
     if (!t && !img) {
@@ -180,7 +230,11 @@ exports.update = async (req, res) => {
     const patch = {};
 
     if (texto !== undefined) {
-      const t = typeof texto === 'string' ? texto.trim() : '';
+      const mod = basicModerateText(texto);
+      if (!mod.ok) {
+        return res.status(400).json({ error: mod.reason || 'Conteúdo não permitido' });
+      }
+      const t = mod.value;
       patch.texto = t ? t : null;
     }
 
@@ -390,7 +444,11 @@ exports.addComment = async (req, res) => {
     const { id } = req.params;
     const { texto } = req.body || {};
 
-    const t = typeof texto === 'string' ? texto.trim() : '';
+    const mod = basicModerateText(texto);
+    if (!mod.ok) {
+      return res.status(400).json({ error: mod.reason || 'Conteúdo não permitido' });
+    }
+    const t = mod.value;
     if (!t) return res.status(400).json({ error: 'Comentário inválido' });
 
     const post = await Post.findByPk(id);
@@ -473,7 +531,11 @@ exports.updateComment = async (req, res) => {
     const { id, commentId } = req.params;
     const { texto } = req.body || {};
 
-    const t = typeof texto === 'string' ? texto.trim() : '';
+    const mod = basicModerateText(texto);
+    if (!mod.ok) {
+      return res.status(400).json({ error: mod.reason || 'Conteúdo não permitido' });
+    }
+    const t = mod.value;
     if (!t) return res.status(400).json({ error: 'Comentário inválido' });
 
     const post = await Post.findByPk(id);

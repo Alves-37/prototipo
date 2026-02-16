@@ -141,7 +141,7 @@ exports.getFeed = async (req, res) => {
     const shouldIncludeVagas = tab === 'todos' || tab === 'vagas';
     const shouldIncludePessoas = tab === 'pessoas';
     const shouldIncludeEmpresas = tab === 'empresas';
-    const shouldIncludeServicos = tab === 'servicos';
+    const shouldIncludeServicos = tab === 'todos' || tab === 'servicos';
     const shouldIncludePosts = tab === 'todos' || tab === 'posts' || tab === 'postagens';
 
     if (shouldIncludePosts) {

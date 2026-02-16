@@ -51,7 +51,7 @@ router.put('/:chamadoId/respostas/:respostaId/aceitar', chamadoController.aceita
 router.put('/:id/favorito', chamadoController.toggleFavorito);
 
 // Rotas com parâmetros dinâmicos (DEVEM vir por último)
-router.put('/:id', chamadoController.atualizar);
+router.put('/:id', uploadImagem.array('imagens', 5), chamadoController.atualizar);
 router.delete('/:id', chamadoController.excluir);
 
 console.log('=== DEBUG: Rotas de chamados registradas ===');

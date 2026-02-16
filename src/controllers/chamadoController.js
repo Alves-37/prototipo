@@ -289,6 +289,31 @@ exports.atualizar = async (req, res) => {
     const { id } = req.params;
     const dadosAtualizacao = req.body;
 
+    const baseUrl = (() => {
+      try {
+        const proto = req.headers['x-forwarded-proto'] || req.protocol;
+        const host = req.get('host');
+        return `${proto}://${host}`;
+      } catch {
+        return '';
+      }
+    })();
+
+    const imagens = (() => {
+      try {
+        const files = Array.isArray(req.files) ? req.files : [];
+        if (!files.length) return null;
+        return files
+          .map((f) => {
+            const publicPath = `/uploads/${f.filename}`;
+            return baseUrl ? `${baseUrl}${publicPath}` : publicPath;
+          })
+          .filter(Boolean);
+      } catch {
+        return null;
+      }
+    })();
+
     const chamado = await Chamado.findOne({
       where: { id, usuarioId: req.user.id }
     });
@@ -300,6 +325,10 @@ exports.atualizar = async (req, res) => {
     // Verificar se pode alterar status
     if (dadosAtualizacao.status && !['aberto', 'em_andamento', 'concluido', 'fechado'].includes(dadosAtualizacao.status)) {
       return res.status(400).json({ error: 'Status inválido' });
+    }
+
+    if (imagens) {
+      dadosAtualizacao.imagens = imagens;
     }
 
     await chamado.update(dadosAtualizacao);

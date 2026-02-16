@@ -322,6 +322,7 @@ exports.getFeed = async (req, res) => {
           createdAt: raw.data || raw.createdAt,
           dataPublicacao: raw.data || raw.createdAt,
           titulo: raw.titulo,
+          texto: raw.descricao,
           descricao: raw.descricao,
           imagens,
           categoria: raw.categoria,

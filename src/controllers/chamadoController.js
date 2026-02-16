@@ -163,6 +163,19 @@ exports.criar = async (req, res) => {
       requisitos
     } = req.body;
 
+    const requisitosNormalizados = (() => {
+      try {
+        if (Array.isArray(requisitos)) return requisitos;
+        if (typeof requisitos === 'string' && requisitos.trim()) {
+          const parsed = JSON.parse(requisitos);
+          return Array.isArray(parsed) ? parsed : [];
+        }
+        return [];
+      } catch {
+        return [];
+      }
+    })();
+
     const baseUrl = (() => {
       try {
         const proto = req.headers['x-forwarded-proto'] || req.protocol;
@@ -192,6 +205,10 @@ exports.criar = async (req, res) => {
       return res.status(400).json({ error: 'Título, descrição e categoria são obrigatórios' });
     }
 
+    if (localizacao !== undefined && localizacao !== null && typeof localizacao === 'string' && !localizacao.trim()) {
+      return res.status(400).json({ error: 'Localização inválida' });
+    }
+
     // Verificar limite de chamados para plano gratuito
     if (req.user.plano === 'gratuito') {
       const totalChamados = await Chamado.count({
@@ -215,7 +232,7 @@ exports.criar = async (req, res) => {
       prioridade: prioridade || 'media',
       telefone: telefone || req.user.telefone,
       email: email || req.user.email,
-      requisitos: requisitos || [],
+      requisitos: requisitosNormalizados,
       imagens,
       usuarioId: req.user.id
     });

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const chamadoController = require('../controllers/chamadoController');
 const { authMiddleware } = require('../middlewares/auth');
+const { uploadImagem } = require('../middlewares/upload');
 
 console.log('=== DEBUG: Registrando rotas de chamados ===');
 
@@ -31,7 +32,7 @@ router.get('/teste/rotas', (req, res) => {
 router.use(authMiddleware);
 
 // CRUD de chamados
-router.post('/', chamadoController.criar);
+router.post('/', uploadImagem.array('imagens', 5), chamadoController.criar);
 
 // Chamados do usuário (DEVEM vir antes das rotas com :id)
 router.get('/usuario/meus', chamadoController.meusChamados);

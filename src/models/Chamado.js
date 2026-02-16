@@ -66,6 +66,11 @@ const Chamado = sequelize.define('Chamado', {
     allowNull: true,
     defaultValue: []
   },
+  imagens: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: []
+  },
   visualizacoes: {
     type: DataTypes.INTEGER,
     allowNull: false,

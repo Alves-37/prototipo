@@ -163,6 +163,30 @@ exports.criar = async (req, res) => {
       requisitos
     } = req.body;
 
+    const baseUrl = (() => {
+      try {
+        const proto = req.headers['x-forwarded-proto'] || req.protocol;
+        const host = req.get('host');
+        return `${proto}://${host}`;
+      } catch {
+        return '';
+      }
+    })();
+
+    const imagens = (() => {
+      try {
+        const files = Array.isArray(req.files) ? req.files : [];
+        return files
+          .map((f) => {
+            const publicPath = `/uploads/${f.filename}`;
+            return baseUrl ? `${baseUrl}${publicPath}` : publicPath;
+          })
+          .filter(Boolean);
+      } catch {
+        return [];
+      }
+    })();
+
     // Validações básicas
     if (!titulo || !descricao || !categoria) {
       return res.status(400).json({ error: 'Título, descrição e categoria são obrigatórios' });
@@ -192,6 +216,7 @@ exports.criar = async (req, res) => {
       telefone: telefone || req.user.telefone,
       email: email || req.user.email,
       requisitos: requisitos || [],
+      imagens,
       usuarioId: req.user.id
     });
 

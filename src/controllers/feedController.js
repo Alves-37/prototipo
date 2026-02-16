@@ -303,6 +303,19 @@ exports.getFeed = async (req, res) => {
           ? toAbsolute(req, author.logo)
           : toAbsolute(req, author.foto);
 
+        const imagens = (() => {
+          try {
+            if (Array.isArray(raw?.imagens)) return raw.imagens.map((x) => toAbsolute(req, x)).filter(Boolean);
+            if (typeof raw?.imagens === 'string' && raw.imagens.trim()) {
+              const parsed = JSON.parse(raw.imagens);
+              return Array.isArray(parsed) ? parsed.map((x) => toAbsolute(req, x)).filter(Boolean) : [];
+            }
+            return [];
+          } catch {
+            return [];
+          }
+        })();
+
         items.push({
           type: 'servico',
           id: raw.id,
@@ -310,6 +323,7 @@ exports.getFeed = async (req, res) => {
           dataPublicacao: raw.data || raw.createdAt,
           titulo: raw.titulo,
           descricao: raw.descricao,
+          imagens,
           categoria: raw.categoria,
           localizacao: raw.localizacao,
           orcamento: raw.orcamento,

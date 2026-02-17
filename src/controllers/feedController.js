@@ -144,7 +144,9 @@ exports.getFeed = async (req, res) => {
     const shouldIncludeServicos = tab === 'todos' || tab === 'servicos';
     const shouldIncludePosts = tab === 'todos' || tab === 'posts' || tab === 'postagens';
 
-    if (shouldIncludePosts) {
+    const fetchPosts = async () => {
+      if (!shouldIncludePosts) return;
+
       const postWhere = {
         ...(query
           ? {
@@ -169,37 +171,38 @@ exports.getFeed = async (req, res) => {
 
       const postIds = posts.map(p => p.id);
 
-      const reactionCounts = postIds.length
-        ? await PostReaction.findAll({
-            attributes: ['postId', [PostReaction.sequelize.fn('COUNT', PostReaction.sequelize.col('id')), 'count']],
-            where: { postId: postIds },
-            group: ['postId'],
-            raw: true,
-          })
-        : [];
-
-      const commentCounts = postIds.length
-        ? await PostComment.findAll({
-            attributes: ['postId', [PostComment.sequelize.fn('COUNT', PostComment.sequelize.col('id')), 'count']],
-            where: { postId: postIds },
-            group: ['postId'],
-            raw: true,
-          })
-        : [];
+      const [reactionCounts, commentCounts, myReactions] = await Promise.all([
+        postIds.length
+          ? PostReaction.findAll({
+              attributes: ['postId', [PostReaction.sequelize.fn('COUNT', PostReaction.sequelize.col('id')), 'count']],
+              where: { postId: postIds },
+              group: ['postId'],
+              raw: true,
+            })
+          : Promise.resolve([]),
+        postIds.length
+          ? PostComment.findAll({
+              attributes: ['postId', [PostComment.sequelize.fn('COUNT', PostComment.sequelize.col('id')), 'count']],
+              where: { postId: postIds },
+              group: ['postId'],
+              raw: true,
+            })
+          : Promise.resolve([]),
+        req.user && postIds.length
+          ? PostReaction.findAll({
+              attributes: ['postId'],
+              where: { postId: postIds, userId: req.user.id },
+              raw: true,
+            })
+          : Promise.resolve([]),
+      ]);
 
       const reactionMap = Object.fromEntries(reactionCounts.map(r => [String(r.postId), Number(r.count) || 0]));
       const commentMap = Object.fromEntries(commentCounts.map(r => [String(r.postId), Number(r.count) || 0]));
 
       const myLikedSet = new Set();
-      if (req.user && postIds.length) {
-        const myReactions = await PostReaction.findAll({
-          attributes: ['postId'],
-          where: { postId: postIds, userId: req.user.id },
-          raw: true,
-        });
-        for (const r of myReactions) {
-          myLikedSet.add(String(r.postId));
-        }
+      for (const r of myReactions) {
+        myLikedSet.add(String(r.postId));
       }
 
       for (const p of posts) {
@@ -235,9 +238,11 @@ exports.getFeed = async (req, res) => {
           },
         });
       }
-    }
+    };
 
-    if (shouldIncludeEmpresas) {
+    const fetchEmpresas = async () => {
+      if (!shouldIncludeEmpresas) return;
+
       const companyWhere = {
         tipo: 'empresa',
         ...(query
@@ -267,9 +272,11 @@ exports.getFeed = async (req, res) => {
           avatarUrl: pub.perfil?.logo,
         });
       }
-    }
+    };
 
-    if (shouldIncludeServicos) {
+    const fetchServicos = async () => {
+      if (!shouldIncludeServicos) return;
+
       const chamadoWhere = {
         ...(query
           ? {
@@ -342,9 +349,11 @@ exports.getFeed = async (req, res) => {
             : null,
         });
       }
-    }
+    };
 
-    if (shouldIncludeVagas) {
+    const fetchVagas = async () => {
+      if (!shouldIncludeVagas) return;
+
       const vagaWhere = {
         status: 'publicada',
         ...(query
@@ -400,9 +409,11 @@ exports.getFeed = async (req, res) => {
             : null,
         });
       }
-    }
+    };
 
-    if (shouldIncludePessoas) {
+    const fetchPessoas = async () => {
+      if (!shouldIncludePessoas) return;
+
       const userWhere = {
         tipo: { [Op.ne]: 'empresa' },
         ...(query
@@ -432,7 +443,15 @@ exports.getFeed = async (req, res) => {
           avatarUrl: pub.perfil?.foto,
         });
       }
-    }
+    };
+
+    await Promise.all([
+      fetchPosts(),
+      fetchEmpresas(),
+      fetchServicos(),
+      fetchVagas(),
+      fetchPessoas(),
+    ]);
 
     items.sort((a, b) => {
       const da = new Date(a.dataPublicacao || a.createdAt || 0).getTime();

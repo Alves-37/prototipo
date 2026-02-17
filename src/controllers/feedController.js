@@ -1,4 +1,4 @@
-const { User, Vaga, Post, PostReaction, PostComment, Connection, Chamado } = require('../models');
+const { User, Vaga, Post, PostReaction, PostComment, Connection, Chamado, Produto } = require('../models');
 const { Op } = require('sequelize');
 
 const toAbsolute = (req, maybePath) => {
@@ -142,6 +142,7 @@ exports.getFeed = async (req, res) => {
     const shouldIncludePessoas = tab === 'pessoas';
     const shouldIncludeEmpresas = tab === 'empresas';
     const shouldIncludeServicos = tab === 'todos' || tab === 'servicos';
+    const shouldIncludeVendas = tab === 'todos' || tab === 'vendas';
     const shouldIncludePosts = tab === 'todos' || tab === 'posts' || tab === 'postagens';
 
     const fetchPosts = async () => {
@@ -154,6 +155,92 @@ exports.getFeed = async (req, res) => {
             }
           : {}),
       };
+
+    const fetchVendas = async () => {
+      if (!shouldIncludeVendas) return;
+
+      const produtoWhere = {
+        ativo: true,
+        ...(query
+          ? {
+              [Op.or]: [
+                { titulo: { [Op.like]: `%${query}%` } },
+                { descricao: { [Op.like]: `%${query}%` } },
+                { categoria: { [Op.like]: `%${query}%` } },
+              ],
+            }
+          : {}),
+      };
+
+      const produtos = await Produto.findAll({
+        where: produtoWhere,
+        include: [
+          {
+            model: User,
+            as: 'empresa',
+            attributes: ['id', 'nome', 'tipo', 'foto', 'logo'],
+          },
+        ],
+        order: [['createdAt', 'DESC']],
+        limit: limitNum,
+        offset,
+      });
+
+      for (const p of produtos) {
+        const raw = typeof p.toJSON === 'function' ? p.toJSON() : p;
+        const author = raw.empresa || null;
+        const avatarUrl = author?.tipo === 'empresa'
+          ? toAbsolute(req, author.logo)
+          : toAbsolute(req, author.foto);
+
+        const imagens = (() => {
+          try {
+            if (Array.isArray(raw?.imagens)) return raw.imagens.map((x) => toAbsolute(req, x)).filter(Boolean);
+            if (typeof raw?.imagens === 'string' && raw.imagens.trim()) {
+              const parsed = JSON.parse(raw.imagens);
+              return Array.isArray(parsed) ? parsed.map((x) => toAbsolute(req, x)).filter(Boolean) : [];
+            }
+            return [];
+          } catch {
+            return [];
+          }
+        })();
+
+        items.push({
+          type: 'venda',
+          id: raw.id,
+          createdAt: raw.createdAt,
+          dataPublicacao: raw.createdAt,
+          titulo: raw.titulo,
+          descricao: raw.descricao,
+          texto: raw.descricao,
+          preco: raw.preco,
+          precoSobConsulta: !!raw.precoSobConsulta,
+          tipoVenda: raw.tipoVenda,
+          estoqueQtd: raw.estoqueQtd,
+          tempoPreparoDias: raw.tempoPreparoDias,
+          categoria: raw.categoria,
+          tags: Array.isArray(raw.tags) ? raw.tags : [],
+          imagens,
+          entregaDisponivel: !!raw.entregaDisponivel,
+          retiradaDisponivel: !!raw.retiradaDisponivel,
+          zonaEntrega: raw.zonaEntrega,
+          custoEntrega: raw.custoEntrega,
+          localRetirada: raw.localRetirada,
+          empresaId: raw.empresaId,
+          empresaNome: author?.nome || 'Empresa',
+          nome: author?.nome || 'Empresa',
+          avatarUrl,
+          author: author
+            ? {
+                id: author.id,
+                nome: author.nome,
+                tipo: author.tipo,
+              }
+            : null,
+        });
+      }
+    };
 
       const posts = await Post.findAll({
         where: postWhere,
@@ -449,6 +536,7 @@ exports.getFeed = async (req, res) => {
       fetchPosts(),
       fetchEmpresas(),
       fetchServicos(),
+      fetchVendas(),
       fetchVagas(),
       fetchPessoas(),
     ]);

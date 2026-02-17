@@ -17,9 +17,10 @@ require('./Post');
 require('./PostReaction');
 require('./PostComment');
 require('./Connection');
+require('./Produto');
 
 // Recupera instâncias a partir do registry do Sequelize
-const { User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, Post, PostReaction, PostComment, Connection } = sequelize.models;
+const { User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, Post, PostReaction, PostComment, Connection, Produto } = sequelize.models;
 
 if (!User || !Vaga) {
   console.error('[Models] Registry incompleto. Disponíveis:', Object.keys(sequelize.models || {}));
@@ -98,6 +99,10 @@ User.hasMany(Connection, { foreignKey: 'addresseeId', as: 'connectionRequestsRec
 Connection.belongsTo(User, { foreignKey: 'requesterId', as: 'requester' });
 Connection.belongsTo(User, { foreignKey: 'addresseeId', as: 'addressee' });
 
+// Associações de produtos (vendas)
+User.hasMany(Produto, { foreignKey: 'empresaId', as: 'produtos' });
+Produto.belongsTo(User, { foreignKey: 'empresaId', as: 'empresa' });
+
 const syncDb = async () => {
   try {
     if (process.env.NODE_ENV === 'production') {
@@ -139,4 +144,4 @@ const syncDb = async () => {
   }
 };
 
-module.exports = { sequelize, User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, Post, PostReaction, PostComment, Connection, syncDb };
+module.exports = { sequelize, User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, Post, PostReaction, PostComment, Connection, Produto, syncDb };

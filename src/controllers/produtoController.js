@@ -193,6 +193,35 @@ exports.create = async (req, res) => {
     });
 
     const raw = typeof produto.toJSON === 'function' ? produto.toJSON() : produto;
+
+    try {
+      const io = req.app && req.app.get ? req.app.get('io') : null;
+      if (io) {
+        io.emit('venda:new', {
+          item: {
+            type: 'venda',
+            id: raw.id,
+            createdAt: raw.createdAt,
+            dataPublicacao: raw.createdAt,
+            titulo: raw.titulo,
+            descricao: raw.descricao,
+            preco: raw.preco,
+            precoSobConsulta: !!raw.precoSobConsulta,
+            tipoVenda: raw.tipoVenda,
+            imagens: normalizeImagens(req, raw.imagens),
+            entregaDisponivel: !!raw.entregaDisponivel,
+            retiradaDisponivel: !!raw.retiradaDisponivel,
+            zonaEntrega: raw.zonaEntrega,
+            custoEntrega: raw.custoEntrega,
+            localRetirada: raw.localRetirada,
+            empresaId: raw.empresaId,
+          },
+        });
+      }
+    } catch (e) {
+      console.error('Falha ao emitir venda:new:', e);
+    }
+
     return res.status(201).json({
       ...raw,
       imagens: normalizeImagens(req, raw.imagens),
@@ -247,6 +276,36 @@ exports.update = async (req, res) => {
     await produto.update(next);
 
     const raw = typeof produto.toJSON === 'function' ? produto.toJSON() : produto;
+
+    try {
+      const io = req.app && req.app.get ? req.app.get('io') : null;
+      if (io) {
+        io.emit('venda:update', {
+          vendaId: Number(raw.id),
+          item: {
+            type: 'venda',
+            id: raw.id,
+            createdAt: raw.createdAt,
+            dataPublicacao: raw.createdAt,
+            titulo: raw.titulo,
+            descricao: raw.descricao,
+            preco: raw.preco,
+            precoSobConsulta: !!raw.precoSobConsulta,
+            tipoVenda: raw.tipoVenda,
+            imagens: normalizeImagens(req, raw.imagens),
+            entregaDisponivel: !!raw.entregaDisponivel,
+            retiradaDisponivel: !!raw.retiradaDisponivel,
+            zonaEntrega: raw.zonaEntrega,
+            custoEntrega: raw.custoEntrega,
+            localRetirada: raw.localRetirada,
+            empresaId: raw.empresaId,
+          },
+        });
+      }
+    } catch (e) {
+      console.error('Falha ao emitir venda:update:', e);
+    }
+
     return res.json({
       ...raw,
       imagens: normalizeImagens(req, raw.imagens),
@@ -271,6 +330,16 @@ exports.remove = async (req, res) => {
     }
 
     await produto.update({ ativo: false });
+
+    try {
+      const io = req.app && req.app.get ? req.app.get('io') : null;
+      if (io) {
+        io.emit('venda:delete', { vendaId: Number(id), empresaId: Number(empresaId) });
+      }
+    } catch (e) {
+      console.error('Falha ao emitir venda:delete:', e);
+    }
+
     return res.json({ ok: true });
   } catch (err) {
     console.error('Erro ao remover produto:', err);

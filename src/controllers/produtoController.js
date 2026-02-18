@@ -1,4 +1,4 @@
-const { Produto, User } = require('../models');
+const { Produto, User, ProdutoReaction, ProdutoComment } = require('../models');
 const { Op } = require('sequelize');
 
 const toAbsolute = (req, maybePath) => {
@@ -8,6 +8,207 @@ const toAbsolute = (req, maybePath) => {
   const baseUrl = `${req.protocol}://${req.get('host')}`;
   const path = f.startsWith('/') ? f : `/${f}`;
   return `${baseUrl}${path}`;
+};
+
+const REACTION_TYPES = ['like', 'love', 'wow', 'haha', 'sad'];
+
+const publicAuthor = (req, u) => {
+  try {
+    if (!u) return null;
+    const raw = typeof u.toJSON === 'function' ? u.toJSON() : u;
+    const avatarUrl = raw?.tipo === 'empresa'
+      ? toAbsolute(req, raw.logo)
+      : toAbsolute(req, raw.foto);
+    return {
+      id: raw.id,
+      nome: raw.nome,
+      tipo: raw.tipo,
+      foto: toAbsolute(req, raw.foto),
+      logo: toAbsolute(req, raw.logo),
+      avatarUrl,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const normalizeAnexo = (req, maybePath) => {
+  try {
+    const raw = String(maybePath || '').trim();
+    if (!raw) return null;
+    return toAbsolute(req, raw);
+  } catch {
+    return null;
+  }
+};
+
+exports.toggleReaction = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Não autenticado' });
+
+    const { id } = req.params;
+    const tipo = String(req.body?.type || 'like').toLowerCase();
+    if (!REACTION_TYPES.includes(tipo)) {
+      return res.status(400).json({ error: 'Tipo de reação inválido' });
+    }
+
+    const produto = await Produto.findByPk(id);
+    if (!produto) return res.status(404).json({ error: 'Produto não encontrado' });
+
+    const existing = await ProdutoReaction.findOne({ where: { produtoId: id, userId } });
+
+    let reacted = true;
+    let reactionType = tipo;
+
+    if (existing) {
+      const sameType = String(existing.type || '').toLowerCase() === tipo;
+      if (sameType) {
+        await existing.destroy();
+        reacted = false;
+        reactionType = null;
+      } else {
+        await existing.update({ type: tipo });
+      }
+    } else {
+      await ProdutoReaction.create({ produtoId: id, userId, type: tipo });
+    }
+
+    const [total, byTypeRaw] = await Promise.all([
+      ProdutoReaction.count({ where: { produtoId: id } }),
+      ProdutoReaction.findAll({
+        attributes: ['type', [ProdutoReaction.sequelize.fn('COUNT', ProdutoReaction.sequelize.col('id')), 'count']],
+        where: { produtoId: id },
+        group: ['type'],
+        raw: true,
+      }),
+    ]);
+
+    const byType = {};
+    for (const r of byTypeRaw || []) {
+      const k = String(r.type || '').toLowerCase();
+      byType[k] = Number(r.count) || 0;
+    }
+
+    try {
+      const io = req.app && req.app.get ? req.app.get('io') : null;
+      if (io) {
+        io.emit('produto:reaction', {
+          produtoId: Number(id),
+          userId: Number(userId),
+          reacted,
+          type: reactionType,
+          counts: { total, byType },
+        });
+      }
+    } catch (e) {
+      console.error('Falha ao emitir produto:reaction:', e);
+    }
+
+    return res.json({
+      produtoId: Number(id),
+      reacted,
+      type: reactionType,
+      counts: { total, byType },
+    });
+  } catch (err) {
+    console.error('Erro ao reagir ao produto:', err);
+    return res.status(500).json({ error: 'Erro ao reagir ao produto' });
+  }
+};
+
+exports.listComments = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const produto = await Produto.findByPk(id);
+    if (!produto) return res.status(404).json({ error: 'Produto não encontrado' });
+
+    const comments = await ProdutoComment.findAll({
+      where: { produtoId: id },
+      order: [['createdAt', 'ASC']],
+      include: [{ model: User, as: 'author', attributes: ['id', 'nome', 'tipo', 'foto', 'logo'] }],
+    });
+
+    return res.json({
+      produtoId: Number(id),
+      comments: comments.map(c => {
+        const raw = typeof c.toJSON === 'function' ? c.toJSON() : c;
+        return {
+          id: raw.id,
+          produtoId: raw.produtoId,
+          userId: raw.userId,
+          texto: raw.texto,
+          anexoUrl: normalizeAnexo(req, raw.anexoUrl),
+          anexoTipo: raw.anexoTipo || null,
+          createdAt: raw.createdAt,
+          author: publicAuthor(req, raw.author),
+        };
+      }),
+    });
+  } catch (err) {
+    console.error('Erro ao listar comentários do produto:', err);
+    return res.status(500).json({ error: 'Erro ao listar comentários' });
+  }
+};
+
+exports.addComment = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Não autenticado' });
+
+    const { id } = req.params;
+    const texto = String(req.body?.texto || '').trim();
+    if (!texto) return res.status(400).json({ error: 'Comentário vazio' });
+
+    const produto = await Produto.findByPk(id);
+    if (!produto) return res.status(404).json({ error: 'Produto não encontrado' });
+
+    const file = Array.isArray(req.files) ? req.files[0] : (req.file || null);
+    const anexoUrl = file ? `/uploads/${file.filename}` : null;
+    const anexoTipo = file ? String(file.mimetype || '') : null;
+
+    const created = await ProdutoComment.create({
+      produtoId: id,
+      userId,
+      texto,
+      anexoUrl,
+      anexoTipo,
+    });
+
+    const full = await ProdutoComment.findByPk(created.id, {
+      include: [{ model: User, as: 'author', attributes: ['id', 'nome', 'tipo', 'foto', 'logo'] }],
+    });
+    const raw = typeof full.toJSON === 'function' ? full.toJSON() : full;
+
+    const payload = {
+      id: raw.id,
+      produtoId: raw.produtoId,
+      userId: raw.userId,
+      texto: raw.texto,
+      anexoUrl: normalizeAnexo(req, raw.anexoUrl),
+      anexoTipo: raw.anexoTipo || null,
+      createdAt: raw.createdAt,
+      author: publicAuthor(req, raw.author),
+    };
+
+    try {
+      const io = req.app && req.app.get ? req.app.get('io') : null;
+      if (io) {
+        io.emit('produto:comment:new', {
+          produtoId: Number(id),
+          comment: payload,
+        });
+      }
+    } catch (e) {
+      console.error('Falha ao emitir produto:comment:new:', e);
+    }
+
+    return res.status(201).json(payload);
+  } catch (err) {
+    console.error('Erro ao comentar produto:', err);
+    return res.status(500).json({ error: 'Erro ao comentar produto' });
+  }
 };
 
 const normalizeImagens = (req, raw) => {

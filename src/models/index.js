@@ -18,9 +18,11 @@ require('./PostReaction');
 require('./PostComment');
 require('./Connection');
 require('./Produto');
+require('./ProdutoReaction');
+require('./ProdutoComment');
 
 // Recupera instâncias a partir do registry do Sequelize
-const { User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, Post, PostReaction, PostComment, Connection, Produto } = sequelize.models;
+const { User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, Post, PostReaction, PostComment, Connection, Produto, ProdutoReaction, ProdutoComment } = sequelize.models;
 
 if (!User || !Vaga) {
   console.error('[Models] Registry incompleto. Disponíveis:', Object.keys(sequelize.models || {}));
@@ -103,6 +105,16 @@ Connection.belongsTo(User, { foreignKey: 'addresseeId', as: 'addressee' });
 User.hasMany(Produto, { foreignKey: 'empresaId', as: 'produtos' });
 Produto.belongsTo(User, { foreignKey: 'empresaId', as: 'empresa' });
 
+Produto.hasMany(ProdutoReaction, { foreignKey: 'produtoId', as: 'reactions' });
+ProdutoReaction.belongsTo(Produto, { foreignKey: 'produtoId', as: 'produto' });
+User.hasMany(ProdutoReaction, { foreignKey: 'userId', as: 'produtoReactions' });
+ProdutoReaction.belongsTo(User, { foreignKey: 'userId', as: 'author' });
+
+Produto.hasMany(ProdutoComment, { foreignKey: 'produtoId', as: 'comments' });
+ProdutoComment.belongsTo(Produto, { foreignKey: 'produtoId', as: 'produto' });
+User.hasMany(ProdutoComment, { foreignKey: 'userId', as: 'produtoComments' });
+ProdutoComment.belongsTo(User, { foreignKey: 'userId', as: 'author' });
+
 const syncDb = async () => {
   try {
     if (process.env.NODE_ENV === 'production') {
@@ -144,4 +156,4 @@ const syncDb = async () => {
   }
 };
 
-module.exports = { sequelize, User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, Post, PostReaction, PostComment, Connection, Produto, syncDb };
+module.exports = { sequelize, User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, Post, PostReaction, PostComment, Connection, Produto, ProdutoReaction, ProdutoComment, syncDb };

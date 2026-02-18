@@ -19,6 +19,35 @@ const normalizeImagens = (req, raw) => {
   }
 };
 
+const parseImagensKeep = (raw) => {
+  try {
+    if (raw === undefined || raw === null) return undefined;
+    if (Array.isArray(raw)) return raw.map(String).filter(Boolean);
+    if (typeof raw !== 'string') return undefined;
+    const trimmed = raw.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith('[')) {
+      const parsed = JSON.parse(trimmed);
+      return Array.isArray(parsed) ? parsed.map(String).filter(Boolean) : [];
+    }
+    return trimmed.split(',').map(s => s.trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
+};
+
+const sanitizeRelativeUploadPath = (p) => {
+  try {
+    const s = String(p || '').trim();
+    if (!s) return null;
+    if (!s.startsWith('/uploads/')) return null;
+    if (s.includes('..')) return null;
+    return s;
+  } catch {
+    return null;
+  }
+};
+
 const parseTags = (tags) => {
   try {
     if (tags === undefined || tags === null) return undefined;
@@ -250,6 +279,8 @@ exports.update = async (req, res) => {
     const files = Array.isArray(req.files) ? req.files : [];
     const novasImagens = files.map(f => `/uploads/${f.filename}`);
 
+    const imagensKeepParsed = parseImagensKeep(body.imagensKeep);
+
     const next = {
       ...(body.titulo !== undefined ? { titulo: String(body.titulo).trim() } : {}),
       ...(body.descricao !== undefined ? { descricao: body.descricao !== null ? String(body.descricao) : null } : {}),
@@ -268,9 +299,11 @@ exports.update = async (req, res) => {
       ...(body.ativo !== undefined ? { ativo: String(body.ativo).toLowerCase() === 'true' ? true : !!body.ativo } : {}),
     };
 
-    if (novasImagens.length) {
-      const current = Array.isArray(produto.imagens) ? produto.imagens : [];
-      next.imagens = [...current, ...novasImagens];
+    if (imagensKeepParsed !== undefined || novasImagens.length) {
+      const keep = (Array.isArray(imagensKeepParsed) ? imagensKeepParsed : (Array.isArray(produto.imagens) ? produto.imagens : []))
+        .map(sanitizeRelativeUploadPath)
+        .filter(Boolean);
+      next.imagens = [...keep, ...novasImagens];
     }
 
     await produto.update(next);

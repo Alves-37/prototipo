@@ -316,11 +316,14 @@ exports.getFeed = async (req, res) => {
           empresaNome: author?.nome || 'Empresa',
           nome: author?.nome || 'Empresa',
           avatarUrl,
+          empresaLogo: author?.tipo === 'empresa' ? toAbsolute(req, author.logo) : toAbsolute(req, author.foto),
           author: author
             ? {
                 id: author.id,
                 nome: author.nome,
                 tipo: author.tipo,
+                foto: toAbsolute(req, author.foto),
+                logo: toAbsolute(req, author.logo),
               }
             : null,
         });

@@ -63,5 +63,7 @@ router.delete('/:id', authMiddleware, empresaMiddleware, produtoController.remov
 router.post('/:id/reaction', authMiddleware, produtoController.toggleReaction);
 router.get('/:id/comments', produtoController.listComments);
 router.post('/:id/comments', authMiddleware, uploadProdutoCommentAnexo.single('anexo'), produtoController.addComment);
+router.put('/:id/comments/:commentId', authMiddleware, produtoController.updateComment);
+router.delete('/:id/comments/:commentId', authMiddleware, produtoController.deleteComment);
 
 module.exports = router;

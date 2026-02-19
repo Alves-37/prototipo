@@ -1,4 +1,4 @@
-const { Produto, User, ProdutoReaction, ProdutoComment } = require('../models');
+const { Produto, User, ProdutoReaction, ProdutoComment, Notificacao } = require('../models');
 const { Op } = require('sequelize');
 
 const toAbsolute = (req, maybePath) => {
@@ -42,6 +42,47 @@ const normalizeAnexo = (req, maybePath) => {
   }
 };
 
+const emitNotificationToUser = async (req, userId, notif) => {
+  try {
+    const io = req.app && req.app.get ? req.app.get('io') : null;
+    if (!io) return;
+    io.to(`user:${userId}`).emit('notification:new', {
+      id: notif.id,
+      usuarioId: userId,
+      titulo: notif.titulo,
+      mensagem: notif.mensagem,
+      lida: notif.lida,
+      createdAt: notif.createdAt,
+    });
+  } catch (e) {
+    console.error('Falha ao emitir notification:new:', e);
+  }
+};
+
+const notifyProdutoOwner = async (req, produto, actorUserId, titulo, mensagem) => {
+  try {
+    const ownerId = Number(produto?.empresaId);
+    const actorId = Number(actorUserId);
+    if (!ownerId || !actorId) return;
+    if (ownerId === actorId) return;
+    if (!Notificacao) return;
+
+    const notif = await Notificacao.create({
+      usuarioId: ownerId,
+      tipo: 'sistema',
+      titulo,
+      mensagem,
+      referenciaTipo: 'outro',
+      referenciaId: Number(produto?.id) || null,
+      lida: false,
+    });
+
+    await emitNotificationToUser(req, ownerId, notif);
+  } catch (e) {
+    console.error('Falha ao criar/emitir notificação do produto:', e);
+  }
+};
+
 exports.toggleReaction = async (req, res) => {
   try {
     const userId = req.user?.id;
@@ -72,6 +113,22 @@ exports.toggleReaction = async (req, res) => {
       }
     } else {
       await ProdutoReaction.create({ produtoId: id, userId, type: tipo });
+    }
+
+    // Notificar dono do produto (somente quando adiciona/atualiza reação)
+    try {
+      if (reacted) {
+        const actorName = req.user?.nome || 'Alguém';
+        await notifyProdutoOwner(
+          req,
+          produto,
+          userId,
+          'Reação no produto',
+          `${actorName} reagiu ao seu produto.`
+        );
+      }
+    } catch (e) {
+      console.error('Falha ao notificar dono do produto (reação):', e);
     }
 
     const [total, byTypeRaw] = await Promise.all([
@@ -192,6 +249,20 @@ exports.addComment = async (req, res) => {
       author: publicAuthor(req, raw.author),
     };
 
+    // Notificar dono do produto
+    try {
+      const actorName = req.user?.nome || 'Alguém';
+      await notifyProdutoOwner(
+        req,
+        produto,
+        userId,
+        'Comentário no produto',
+        `${actorName} comentou no seu produto.`
+      );
+    } catch (e) {
+      console.error('Falha ao notificar dono do produto (comentário):', e);
+    }
+
     try {
       const io = req.app && req.app.get ? req.app.get('io') : null;
       if (io) {
@@ -208,6 +279,103 @@ exports.addComment = async (req, res) => {
   } catch (err) {
     console.error('Erro ao comentar produto:', err);
     return res.status(500).json({ error: 'Erro ao comentar produto' });
+  }
+};
+
+exports.updateComment = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Não autenticado' });
+
+    const { id, commentId } = req.params;
+    const texto = String(req.body?.texto || '').trim();
+    if (!texto) return res.status(400).json({ error: 'Comentário vazio' });
+
+    const produto = await Produto.findByPk(id);
+    if (!produto) return res.status(404).json({ error: 'Produto não encontrado' });
+
+    const comment = await ProdutoComment.findOne({ where: { id: commentId, produtoId: id } });
+    if (!comment) return res.status(404).json({ error: 'Comentário não encontrado' });
+
+    if (Number(comment.userId) !== Number(userId)) {
+      return res.status(403).json({ error: 'Sem permissão para editar este comentário' });
+    }
+
+    await comment.update({ texto });
+
+    const full = await ProdutoComment.findByPk(comment.id, {
+      include: [{ model: User, as: 'author', attributes: ['id', 'nome', 'tipo', 'foto', 'logo'] }],
+    });
+    const raw = typeof full.toJSON === 'function' ? full.toJSON() : full;
+    const payload = {
+      id: raw.id,
+      produtoId: raw.produtoId,
+      userId: raw.userId,
+      texto: raw.texto,
+      anexoUrl: normalizeAnexo(req, raw.anexoUrl),
+      anexoTipo: raw.anexoTipo || null,
+      createdAt: raw.createdAt,
+      updatedAt: raw.updatedAt,
+      author: publicAuthor(req, raw.author),
+    };
+
+    try {
+      const io = req.app && req.app.get ? req.app.get('io') : null;
+      if (io) {
+        io.emit('produto:comment:update', {
+          produtoId: Number(id),
+          commentId: Number(commentId),
+          comment: payload,
+        });
+      }
+    } catch (e) {
+      console.error('Falha ao emitir produto:comment:update:', e);
+    }
+
+    return res.json(payload);
+  } catch (err) {
+    console.error('Erro ao editar comentário do produto:', err);
+    return res.status(500).json({ error: 'Erro ao editar comentário' });
+  }
+};
+
+exports.deleteComment = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Não autenticado' });
+
+    const { id, commentId } = req.params;
+
+    const produto = await Produto.findByPk(id);
+    if (!produto) return res.status(404).json({ error: 'Produto não encontrado' });
+
+    const comment = await ProdutoComment.findOne({ where: { id: commentId, produtoId: id } });
+    if (!comment) return res.status(404).json({ error: 'Comentário não encontrado' });
+
+    const isAuthor = Number(comment.userId) === Number(userId);
+    const isOwner = Number(produto.empresaId) === Number(userId);
+    if (!isAuthor && !isOwner) {
+      return res.status(403).json({ error: 'Sem permissão para apagar este comentário' });
+    }
+
+    await comment.destroy();
+
+    try {
+      const io = req.app && req.app.get ? req.app.get('io') : null;
+      if (io) {
+        io.emit('produto:comment:delete', {
+          produtoId: Number(id),
+          commentId: Number(commentId),
+        });
+      }
+    } catch (e) {
+      console.error('Falha ao emitir produto:comment:delete:', e);
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao eliminar comentário do produto:', err);
+    return res.status(500).json({ error: 'Erro ao eliminar comentário' });
   }
 };
 

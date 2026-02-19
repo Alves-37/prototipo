@@ -176,6 +176,8 @@ exports.criar = async (req, res) => {
     }
     
     // Criar a vaga
+    const imagem = req.file ? `/uploads/${req.file.filename}` : undefined;
+
     const vaga = await Vaga.create({
       titulo,
       descricao,
@@ -192,7 +194,8 @@ exports.criar = async (req, res) => {
       premium: premium || false,
       capacidadeVagas: capacidadeVagas || 1,
       status: 'publicada',
-      statusCapacidade: 'aberta'
+      statusCapacidade: 'aberta',
+      imagem
     });
     
     // Buscar vaga com dados da empresa
@@ -254,7 +257,7 @@ exports.atualizar = async (req, res) => {
     const camposPermitidos = [
       'titulo', 'descricao', 'requisitos', 'beneficios', 'salario',
       'localizacao', 'tipoContrato', 'nivelExperiencia', 'modalidade',
-      'area', 'dataExpiracao', 'premium', 'status'
+      'area', 'dataExpiracao', 'premium', 'status', 'imagem'
     ];
     
     const dadosAtualizacao = {};
@@ -263,6 +266,11 @@ exports.atualizar = async (req, res) => {
         dadosAtualizacao[campo] = req.body[campo];
       }
     });
+
+    // Se veio nova imagem no upload, sobrescrever o campo imagem
+    if (req.file) {
+      dadosAtualizacao.imagem = `/uploads/${req.file.filename}`;
+    }
     
     // Verificar se pode tornar premium
     if (dadosAtualizacao.premium && !['premium', 'empresarial'].includes(req.user.plano)) {

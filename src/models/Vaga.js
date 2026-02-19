@@ -27,6 +27,10 @@ const Vaga = sequelize.define('Vaga', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  imagem: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   localizacao: {
     type: DataTypes.STRING,
     allowNull: true,

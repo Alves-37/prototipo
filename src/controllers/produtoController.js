@@ -72,7 +72,7 @@ const notifyProdutoOwner = async (req, produto, actorUserId, titulo, mensagem) =
       tipo: 'sistema',
       titulo,
       mensagem,
-      referenciaTipo: 'outro',
+      referenciaTipo: 'produto',
       referenciaId: Number(produto?.id) || null,
       lida: false,
     });

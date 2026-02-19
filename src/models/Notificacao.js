@@ -25,7 +25,7 @@ const Notificacao = sequelize.define('Notificacao', {
     allowNull: false,
   },
   referenciaTipo: {
-    type: DataTypes.ENUM('vaga', 'chamado', 'candidatura', 'outro'),
+    type: DataTypes.ENUM('vaga', 'chamado', 'candidatura', 'produto', 'outro'),
     allowNull: true,
   },
   referenciaId: {

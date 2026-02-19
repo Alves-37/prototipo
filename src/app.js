@@ -44,7 +44,9 @@ app.use(express.urlencoded({ extended: true, limit: '200mb' }));
 app.use(passport.initialize());
 
 // Servir arquivos estáticos (uploads)
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', express.static(process.env.UPLOAD_DIR && String(process.env.UPLOAD_DIR).trim()
+  ? String(process.env.UPLOAD_DIR).trim()
+  : path.join(__dirname, '../uploads')));
 
 // Rotas
 app.use('/api/candidaturas', candidaturaRoutes);

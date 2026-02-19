@@ -6,6 +6,7 @@ const { authMiddleware } = require('../middlewares/auth');
 // Público
 router.get('/', postController.list);
 router.get('/:id/comments', postController.listComments);
+router.get('/:id/likes', postController.listLikes);
 
 // Protegido
 router.post('/', authMiddleware, postController.create);

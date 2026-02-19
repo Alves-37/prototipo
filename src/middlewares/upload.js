@@ -2,11 +2,19 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
+const resolveUploadDir = () => {
+  const fromEnv = process.env.UPLOAD_DIR;
+  if (fromEnv && String(fromEnv).trim()) {
+    return String(fromEnv).trim();
+  }
+  return path.join(__dirname, '../../uploads');
+};
+
 // Configurar o armazenamento
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     // Criar pasta uploads se não existir
-    const uploadDir = path.join(__dirname, '../../uploads');
+    const uploadDir = resolveUploadDir();
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }

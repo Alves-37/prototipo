@@ -1,4 +1,4 @@
-const { User, Vaga, Post, PostReaction, PostComment, Connection, Chamado, Produto } = require('../models');
+const { User, Vaga, Post, PostReaction, PostComment, Connection, Chamado, Produto, ProdutoReaction, ProdutoComment } = require('../models');
 const { Op } = require('sequelize');
 
 const toAbsolute = (req, maybePath) => {
@@ -271,6 +271,62 @@ exports.getFeed = async (req, res) => {
         offset,
       });
 
+      const produtoIds = produtos.map(p => p.id);
+
+      const [reactionCounts, reactionCountsByType, commentCounts, myReactions] = await Promise.all([
+        produtoIds.length
+          ? ProdutoReaction.findAll({
+              attributes: ['produtoId', [ProdutoReaction.sequelize.fn('COUNT', ProdutoReaction.sequelize.col('id')), 'count']],
+              where: { produtoId: produtoIds },
+              group: ['produtoId'],
+              raw: true,
+            })
+          : Promise.resolve([]),
+        produtoIds.length
+          ? ProdutoReaction.findAll({
+              attributes: [
+                'produtoId',
+                'type',
+                [ProdutoReaction.sequelize.fn('COUNT', ProdutoReaction.sequelize.col('id')), 'count'],
+              ],
+              where: { produtoId: produtoIds },
+              group: ['produtoId', 'type'],
+              raw: true,
+            })
+          : Promise.resolve([]),
+        produtoIds.length
+          ? ProdutoComment.findAll({
+              attributes: ['produtoId', [ProdutoComment.sequelize.fn('COUNT', ProdutoComment.sequelize.col('id')), 'count']],
+              where: { produtoId: produtoIds },
+              group: ['produtoId'],
+              raw: true,
+            })
+          : Promise.resolve([]),
+        req.user && produtoIds.length
+          ? ProdutoReaction.findAll({
+              attributes: ['produtoId', 'type'],
+              where: { produtoId: produtoIds, userId: req.user.id },
+              raw: true,
+            })
+          : Promise.resolve([]),
+      ]);
+
+      const reactionMap = Object.fromEntries((reactionCounts || []).map(r => [String(r.produtoId), Number(r.count) || 0]));
+      const commentMap = Object.fromEntries((commentCounts || []).map(r => [String(r.produtoId), Number(r.count) || 0]));
+
+      const reactionsByTypeMap = {};
+      for (const r of reactionCountsByType || []) {
+        const pid = String(r.produtoId);
+        const type = String(r.type || '').toLowerCase();
+        if (!reactionsByTypeMap[pid]) reactionsByTypeMap[pid] = {};
+        reactionsByTypeMap[pid][type] = Number(r.count) || 0;
+      }
+
+      const myReactionTypeByProdutoId = {};
+      for (const r of myReactions || []) {
+        myReactionTypeByProdutoId[String(r.produtoId)] = String(r.type || '').toLowerCase();
+      }
+
       for (const p of produtos) {
         const raw = typeof p.toJSON === 'function' ? p.toJSON() : p;
         const author = raw.empresa || null;
@@ -317,6 +373,12 @@ exports.getFeed = async (req, res) => {
           nome: author?.nome || 'Empresa',
           avatarUrl,
           empresaLogo: author?.tipo === 'empresa' ? toAbsolute(req, author.logo) : toAbsolute(req, author.foto),
+          myReactionType: req.user ? (myReactionTypeByProdutoId[String(raw.id)] || null) : null,
+          counts: {
+            reactions: reactionMap[String(raw.id)] || 0,
+            reactionsByType: reactionsByTypeMap[String(raw.id)] || {},
+            comments: commentMap[String(raw.id)] || 0,
+          },
           author: author
             ? {
                 id: author.id,

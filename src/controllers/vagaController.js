@@ -168,13 +168,6 @@ exports.criar = async (req, res) => {
       }
     });
     
-    // Verificar se pode publicar vaga premium
-    if (premium && !['premium', 'empresarial'].includes(empresa.plano)) {
-      return res.status(403).json({ 
-        error: 'Apenas empresas com plano Premium ou Empresarial podem publicar vagas premium' 
-      });
-    }
-    
     // Criar a vaga
     const imagem = req.file ? `/uploads/${req.file.filename}` : undefined;
 
@@ -270,13 +263,6 @@ exports.atualizar = async (req, res) => {
     // Se veio nova imagem no upload, sobrescrever o campo imagem
     if (req.file) {
       dadosAtualizacao.imagem = `/uploads/${req.file.filename}`;
-    }
-    
-    // Verificar se pode tornar premium
-    if (dadosAtualizacao.premium && !['premium', 'empresarial'].includes(req.user.plano)) {
-      return res.status(403).json({ 
-        error: 'Apenas empresas com plano Premium ou Empresarial podem publicar vagas premium' 
-      });
     }
     
     await vaga.update(dadosAtualizacao);

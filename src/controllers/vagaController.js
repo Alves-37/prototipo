@@ -1,5 +1,32 @@
 const { Vaga, User, Candidatura, Notificacao } = require('../models');
 const { Op } = require('sequelize');
+const path = require('path');
+const fs = require('fs');
+
+const uploadSingleToCloudinaryOrLocal = async (fileObj, folder) => {
+  if (!fileObj) return undefined;
+
+  const cloudinary = require('../config/cloudinary');
+  if (!cloudinary) {
+    return `/uploads/${fileObj.filename}`;
+  }
+
+  try {
+    const fullPath = fileObj.path || path.join(__dirname, '../../uploads', fileObj.filename);
+    const result = await cloudinary.uploader.upload(fullPath, {
+      folder: `nevu/${folder}`,
+      resource_type: 'image',
+    });
+
+    try { fs.unlinkSync(fullPath); } catch {}
+
+    if (result?.secure_url) return String(result.secure_url);
+  } catch (e) {
+    console.error('Falha ao enviar imagem da vaga ao Cloudinary:', e);
+  }
+
+  return `/uploads/${fileObj.filename}`;
+};
 
 // Listar todas as vagas públicas (para candidatos)
 exports.listarTodas = async (req, res) => {
@@ -192,7 +219,7 @@ exports.criar = async (req, res) => {
     });
     
     // Criar a vaga
-    const imagem = req.file ? `/uploads/${req.file.filename}` : undefined;
+    const imagem = await uploadSingleToCloudinaryOrLocal(req.file, 'vagas');
 
     const vaga = await Vaga.create({
       titulo,
@@ -285,7 +312,7 @@ exports.atualizar = async (req, res) => {
 
     // Se veio nova imagem no upload, sobrescrever o campo imagem
     if (req.file) {
-      dadosAtualizacao.imagem = `/uploads/${req.file.filename}`;
+      dadosAtualizacao.imagem = await uploadSingleToCloudinaryOrLocal(req.file, 'vagas');
     }
     
     await vaga.update(dadosAtualizacao);

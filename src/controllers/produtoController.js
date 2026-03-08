@@ -1,5 +1,7 @@
 const { Produto, User, ProdutoReaction, ProdutoComment, Notificacao } = require('../models');
 const { Op } = require('sequelize');
+const path = require('path');
+const fs = require('fs');
 
 const toAbsolute = (req, maybePath) => {
   if (!maybePath) return null;
@@ -58,6 +60,33 @@ const normalizeAnexo = (req, maybePath) => {
   } catch {
     return null;
   }
+};
+
+const uploadLocalFilesToCloudinary = async (files, folder) => {
+  const cloudinary = require('../config/cloudinary');
+  if (!cloudinary) return null;
+
+  const list = Array.isArray(files) ? files : [];
+  const uploaded = [];
+  for (const f of list) {
+    try {
+      const fullPath = f?.path || path.join(__dirname, '../../uploads', f.filename);
+      const result = await cloudinary.uploader.upload(fullPath, {
+        folder: `nevu/${folder}`,
+        resource_type: 'image',
+      });
+
+      try { fs.unlinkSync(fullPath); } catch {}
+
+      if (result?.secure_url) uploaded.push(String(result.secure_url));
+    } catch (e) {
+      // Se falhar o upload no cloudinary, seguimos com as próximas.
+      // O create/update continua com fallback para /uploads.
+      console.error('Falha ao enviar imagem do produto ao Cloudinary:', e);
+    }
+  }
+
+  return uploaded;
 };
 
 const emitNotificationToUser = async (req, userId, notif) => {
@@ -427,6 +456,7 @@ const sanitizeRelativeUploadPath = (p) => {
   try {
     const s = String(p || '').trim();
     if (!s) return null;
+    if (s.startsWith('http://') || s.startsWith('https://') || s.startsWith('data:')) return s;
     if (!s.startsWith('/uploads/')) return null;
     if (s.includes('..')) return null;
     return s;
@@ -586,7 +616,10 @@ exports.create = async (req, res) => {
     }
 
     const files = Array.isArray(req.files) ? req.files : [];
-    const imagens = files.map(f => `/uploads/${f.filename}`);
+    const cloudUploaded = await uploadLocalFilesToCloudinary(files, 'produtos');
+    const imagens = Array.isArray(cloudUploaded) && cloudUploaded.length
+      ? cloudUploaded
+      : files.map(f => `/uploads/${f.filename}`);
 
     const produto = await Produto.create({
       empresaId,
@@ -679,7 +712,10 @@ exports.update = async (req, res) => {
     const body = req.body || {};
 
     const files = Array.isArray(req.files) ? req.files : [];
-    const novasImagens = files.map(f => `/uploads/${f.filename}`);
+    const cloudUploaded = await uploadLocalFilesToCloudinary(files, 'produtos');
+    const novasImagens = Array.isArray(cloudUploaded) && cloudUploaded.length
+      ? cloudUploaded
+      : files.map(f => `/uploads/${f.filename}`);
 
     const imagensKeepParsed = parseImagensKeep(body.imagensKeep);
 

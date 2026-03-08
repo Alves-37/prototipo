@@ -1,4 +1,7 @@
-const { Denuncia } = require('../models');
+const { Denuncia, Post } = require('../models');
+const { Op } = require('sequelize');
+
+const POST_HIDE_THRESHOLD = 3;
 
 // Criar denúncia (somente autenticado)
 exports.criar = async (req, res) => {
@@ -19,6 +22,29 @@ exports.criar = async (req, res) => {
 
     const anexo = req.file ? req.file.filename : null;
 
+    if (referenciaTipo === 'post') {
+      if (!referenciaId) {
+        return res.status(400).json({ error: 'referenciaId é obrigatório para denúncia de post.' });
+      }
+
+      const post = await Post.findByPk(referenciaId);
+      if (!post) {
+        return res.status(404).json({ error: 'Post não encontrado.' });
+      }
+
+      const ja = await Denuncia.count({
+        where: {
+          autorId: req.user.id,
+          referenciaTipo: 'post',
+          referenciaId: referenciaId,
+        },
+      });
+
+      if (ja > 0) {
+        return res.status(409).json({ error: 'Você já denunciou este post.' });
+      }
+    }
+
     const denuncia = await Denuncia.create({
       autorId: req.user.id,
       referenciaTipo,
@@ -29,6 +55,25 @@ exports.criar = async (req, res) => {
       prioridade: prioridade || null,
       status: 'aberta',
     });
+
+    if (referenciaTipo === 'post' && referenciaId) {
+      const uniqueReports = await Denuncia.count({
+        distinct: true,
+        col: 'autorId',
+        where: {
+          referenciaTipo: 'post',
+          referenciaId: referenciaId,
+          status: { [Op.in]: ['aberta', 'em_analise'] },
+        },
+      });
+
+      if (uniqueReports >= POST_HIDE_THRESHOLD) {
+        await Post.update(
+          { isHidden: true, hiddenReason: 'denuncias' },
+          { where: { id: referenciaId, isHidden: false } }
+        );
+      }
+    }
 
     res.status(201).json(denuncia);
   } catch (error) {

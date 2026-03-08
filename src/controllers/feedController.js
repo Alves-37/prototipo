@@ -152,6 +152,7 @@ exports.getFeed = async (req, res) => {
       if (!shouldIncludePosts) return;
 
       const postWhere = {
+        isHidden: false,
         ...(query
           ? {
               texto: { [Op.like]: `%${query}%` },
@@ -225,8 +226,13 @@ exports.getFeed = async (req, res) => {
           nome: author?.nome || 'Usuário',
           texto: raw.texto,
           imageUrl: toAbsolute(req, raw.imageUrl),
-          ctaLabel: raw.ctaLabel || null,
-          ctaUrl: raw.ctaUrl || null,
+          postType: raw.postType,
+          servicePrice: raw.servicePrice,
+          serviceCategory: raw.serviceCategory,
+          serviceLocation: raw.serviceLocation,
+          serviceWhatsapp: raw.serviceWhatsapp,
+          ctaText: raw.ctaText,
+          ctaUrl: raw.ctaUrl,
           avatarUrl,
           author: author
             ? {

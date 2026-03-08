@@ -55,29 +55,6 @@ const toAbsolute = (req, maybePath) => {
   return `${baseUrl}${path}`;
 };
 
-const sanitizeCtaLabel = (input) => {
-  const v = typeof input === 'string' ? input.trim() : '';
-  if (!v) return null;
-  return v.slice(0, 40);
-};
-
-const sanitizeCtaUrl = (input) => {
-  const v = typeof input === 'string' ? input.trim() : '';
-  if (!v) return null;
-
-  // Permitir http(s), tel, mailto e wa.me/whatsapp
-  const lowered = v.toLowerCase();
-  const ok = lowered.startsWith('http://')
-    || lowered.startsWith('https://')
-    || lowered.startsWith('tel:')
-    || lowered.startsWith('mailto:')
-    || lowered.startsWith('https://wa.me/')
-    || lowered.startsWith('http://wa.me/');
-
-  if (!ok) return null;
-  return v.slice(0, 500);
-};
-
 const publicAuthor = (req, user) => {
   if (!user) return null;
   const raw = typeof user.toJSON === 'function' ? user.toJSON() : user;
@@ -132,7 +109,7 @@ exports.list = async (req, res) => {
     const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 50);
     const offset = (pageNum - 1) * limitNum;
 
-    const where = {};
+    const where = { isHidden: false };
     if (userId !== undefined && userId !== null && String(userId).trim() !== '') {
       const asNumber = Number(userId);
       where.userId = Number.isFinite(asNumber) ? asNumber : String(userId);
@@ -181,10 +158,15 @@ exports.list = async (req, res) => {
         return {
           id: raw.id,
           userId: raw.userId,
+          postType: raw.postType,
           texto: raw.texto,
           imageUrl: toAbsolute(req, raw.imageUrl),
-          ctaLabel: raw.ctaLabel || null,
-          ctaUrl: raw.ctaUrl || null,
+          servicePrice: raw.servicePrice,
+          serviceCategory: raw.serviceCategory,
+          serviceLocation: raw.serviceLocation,
+          serviceWhatsapp: raw.serviceWhatsapp,
+          ctaText: raw.ctaText,
+          ctaUrl: raw.ctaUrl,
           createdAt: raw.createdAt,
           author: publicAuthor(req, raw.author),
           counts: {
@@ -206,7 +188,26 @@ exports.list = async (req, res) => {
 exports.create = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { texto, imageUrl, ctaLabel, ctaUrl } = req.body || {};
+    const {
+      texto,
+      imageUrl,
+      postType,
+      servicePrice,
+      serviceCategory,
+      serviceLocation,
+      serviceWhatsapp,
+      ctaText,
+      ctaUrl,
+    } = req.body || {};
+
+    const type = String(postType || 'normal').toLowerCase();
+    if (!['normal', 'servico'].includes(type)) {
+      return res.status(400).json({ error: 'Tipo de post inválido' });
+    }
+
+    if (type === 'servico' && req.user.tipo !== 'empresa') {
+      return res.status(403).json({ error: 'Apenas empresas podem publicar serviços.' });
+    }
 
     const mod = basicModerateText(texto);
     if (!mod.ok) {
@@ -215,8 +216,24 @@ exports.create = async (req, res) => {
     const t = mod.value;
     const img = typeof imageUrl === 'string' ? imageUrl.trim() : '';
 
-    const nextCtaLabel = sanitizeCtaLabel(ctaLabel);
-    const nextCtaUrl = sanitizeCtaUrl(ctaUrl);
+    const svcPrice = typeof servicePrice === 'string' ? servicePrice.trim() : '';
+    const svcCategory = typeof serviceCategory === 'string' ? serviceCategory.trim() : '';
+    const svcLocation = typeof serviceLocation === 'string' ? serviceLocation.trim() : '';
+    const svcWhatsapp = typeof serviceWhatsapp === 'string' ? serviceWhatsapp.trim() : '';
+    const ctaT = typeof ctaText === 'string' ? ctaText.trim() : '';
+    const ctaU = typeof ctaUrl === 'string' ? ctaUrl.trim() : '';
+
+    if (type === 'servico') {
+      if (!svcCategory) {
+        return res.status(400).json({ error: 'Categoria do serviço é obrigatória.' });
+      }
+      if (!svcLocation) {
+        return res.status(400).json({ error: 'Localização do serviço é obrigatória.' });
+      }
+      if (!t && !img) {
+        return res.status(400).json({ error: 'Informe texto ou imagem.' });
+      }
+    }
 
     if (!t && !img) {
       return res.status(400).json({ error: 'Informe texto ou imagem.' });
@@ -224,10 +241,15 @@ exports.create = async (req, res) => {
 
     const created = await Post.create({
       userId,
+      postType: type,
       texto: t || null,
       imageUrl: img || null,
-      ctaLabel: nextCtaLabel,
-      ctaUrl: nextCtaUrl,
+      servicePrice: svcPrice || null,
+      serviceCategory: svcCategory || null,
+      serviceLocation: svcLocation || null,
+      serviceWhatsapp: svcWhatsapp || null,
+      ctaText: ctaT || null,
+      ctaUrl: ctaU || null,
     });
 
     const post = await Post.findByPk(created.id, {
@@ -253,8 +275,13 @@ exports.create = async (req, res) => {
             nome: author?.nome || 'Usuário',
             texto: raw.texto,
             imageUrl: toAbsolute(req, raw.imageUrl),
-            ctaLabel: raw.ctaLabel || null,
-            ctaUrl: raw.ctaUrl || null,
+            postType: raw.postType,
+            servicePrice: raw.servicePrice,
+            serviceCategory: raw.serviceCategory,
+            serviceLocation: raw.serviceLocation,
+            serviceWhatsapp: raw.serviceWhatsapp,
+            ctaText: raw.ctaText,
+            ctaUrl: raw.ctaUrl,
             avatarUrl,
             likedByMe: false,
             counts: { likes: 0, comments: 0 },
@@ -268,10 +295,15 @@ exports.create = async (req, res) => {
     return res.status(201).json({
       id: raw.id,
       userId: raw.userId,
+      postType: raw.postType,
       texto: raw.texto,
       imageUrl: toAbsolute(req, raw.imageUrl),
-      ctaLabel: raw.ctaLabel || null,
-      ctaUrl: raw.ctaUrl || null,
+      servicePrice: raw.servicePrice,
+      serviceCategory: raw.serviceCategory,
+      serviceLocation: raw.serviceLocation,
+      serviceWhatsapp: raw.serviceWhatsapp,
+      ctaText: raw.ctaText,
+      ctaUrl: raw.ctaUrl,
       createdAt: raw.createdAt,
       author: publicAuthor(req, raw.author),
       counts: { likes: 0, comments: 0 },
@@ -286,7 +318,7 @@ exports.update = async (req, res) => {
   try {
     const userId = req.user.id;
     const { id } = req.params;
-    const { texto, imageUrl, ctaLabel, ctaUrl } = req.body || {};
+    const { texto, imageUrl } = req.body || {};
 
     const post = await Post.findByPk(id);
     if (!post) return res.status(404).json({ error: 'Post não encontrado' });
@@ -309,14 +341,6 @@ exports.update = async (req, res) => {
     if (imageUrl !== undefined) {
       const img = typeof imageUrl === 'string' ? imageUrl.trim() : '';
       patch.imageUrl = img ? img : null;
-    }
-
-    if (ctaLabel !== undefined) {
-      patch.ctaLabel = sanitizeCtaLabel(ctaLabel);
-    }
-
-    if (ctaUrl !== undefined) {
-      patch.ctaUrl = sanitizeCtaUrl(ctaUrl);
     }
 
     const nextTexto = Object.prototype.hasOwnProperty.call(patch, 'texto') ? patch.texto : post.texto;
@@ -351,8 +375,6 @@ exports.update = async (req, res) => {
             nome: raw.author?.nome || 'Usuário',
             texto: raw.texto,
             imageUrl: toAbsolute(req, raw.imageUrl),
-            ctaLabel: raw.ctaLabel || null,
-            ctaUrl: raw.ctaUrl || null,
             avatarUrl: raw.author?.tipo === 'empresa' ? toAbsolute(req, raw.author?.logo) : toAbsolute(req, raw.author?.foto),
             counts: { likes, comments },
           },
@@ -367,8 +389,6 @@ exports.update = async (req, res) => {
       userId: raw.userId,
       texto: raw.texto,
       imageUrl: toAbsolute(req, raw.imageUrl),
-      ctaLabel: raw.ctaLabel || null,
-      ctaUrl: raw.ctaUrl || null,
       createdAt: raw.createdAt,
       author: publicAuthor(req, raw.author),
       counts: { likes, comments },

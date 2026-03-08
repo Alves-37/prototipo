@@ -11,6 +11,11 @@ const Post = sequelize.define('Post', {
     type: DataTypes.INTEGER,
     allowNull: false,
   },
+  postType: {
+    type: DataTypes.ENUM('normal', 'servico'),
+    allowNull: false,
+    defaultValue: 'normal',
+  },
   texto: {
     type: DataTypes.TEXT,
     allowNull: true,
@@ -19,12 +24,37 @@ const Post = sequelize.define('Post', {
     type: DataTypes.TEXT,
     allowNull: true,
   },
-  ctaLabel: {
+  servicePrice: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  serviceCategory: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  serviceLocation: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  serviceWhatsapp: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  ctaText: {
     type: DataTypes.STRING,
     allowNull: true,
   },
   ctaUrl: {
     type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  isHidden: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  },
+  hiddenReason: {
+    type: DataTypes.STRING,
     allowNull: true,
   },
 }, {

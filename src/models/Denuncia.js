@@ -16,7 +16,7 @@ const Denuncia = sequelize.define('Denuncia', {
     }
   },
   referenciaTipo: {
-    type: DataTypes.ENUM('empresa', 'candidato', 'vaga', 'mensagem', 'outro'),
+    type: DataTypes.ENUM('empresa', 'candidato', 'vaga', 'mensagem', 'post', 'outro'),
     allowNull: false
   },
   referenciaId: {

@@ -17,7 +17,7 @@ exports.list = async (req, res) => {
     if (status && ['aberta','em_analise','resolvida','arquivada'].includes(status)) {
       where.status = status;
     }
-    if (tipo && ['empresa','candidato','vaga','mensagem','outro'].includes(tipo)) {
+    if (tipo && ['empresa','candidato','vaga','mensagem','post','outro'].includes(tipo)) {
       where.referenciaTipo = tipo;
     }
     if (busca) {

@@ -225,6 +225,8 @@ exports.getFeed = async (req, res) => {
           nome: author?.nome || 'Usuário',
           texto: raw.texto,
           imageUrl: toAbsolute(req, raw.imageUrl),
+          ctaLabel: raw.ctaLabel || null,
+          ctaUrl: raw.ctaUrl || null,
           avatarUrl,
           author: author
             ? {

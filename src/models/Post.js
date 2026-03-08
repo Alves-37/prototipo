@@ -19,6 +19,14 @@ const Post = sequelize.define('Post', {
     type: DataTypes.TEXT,
     allowNull: true,
   },
+  ctaLabel: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  ctaUrl: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
 }, {
   tableName: 'posts',
   timestamps: true,

@@ -32,6 +32,24 @@ const publicAuthor = (req, u) => {
   }
 };
 
+const toValidationMessage = (err) => {
+  try {
+    const first = Array.isArray(err?.errors) ? err.errors[0] : null;
+    const path = String(first?.path || '').trim();
+    const key = String(first?.validatorKey || '').trim();
+
+    if (path === 'titulo') {
+      if (key === 'len') return 'O título deve ter entre 3 e 255 caracteres';
+      if (key === 'notEmpty') return 'Informe o título do produto';
+    }
+
+    if (first?.message) return String(first.message);
+    return 'Dados inválidos';
+  } catch {
+    return 'Dados inválidos';
+  }
+};
+
 const normalizeAnexo = (req, maybePath) => {
   try {
     const raw = String(maybePath || '').trim();
@@ -629,8 +647,7 @@ exports.create = async (req, res) => {
     try {
       const name = String(err?.name || '')
       if (name === 'SequelizeValidationError') {
-        const msg = Array.isArray(err?.errors) && err.errors[0]?.message ? String(err.errors[0].message) : 'Produto inválido'
-        return res.status(400).json({ error: msg })
+        return res.status(400).json({ error: toValidationMessage(err) })
       }
 
       if (name === 'SequelizeDatabaseError') {
@@ -733,8 +750,7 @@ exports.update = async (req, res) => {
     try {
       const name = String(err?.name || '')
       if (name === 'SequelizeValidationError') {
-        const msg = Array.isArray(err?.errors) && err.errors[0]?.message ? String(err.errors[0].message) : 'Produto inválido'
-        return res.status(400).json({ error: msg })
+        return res.status(400).json({ error: toValidationMessage(err) })
       }
 
       if (name === 'SequelizeDatabaseError') {

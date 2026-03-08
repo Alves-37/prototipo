@@ -440,6 +440,8 @@ exports.getFeed = async (req, res) => {
     const fetchServicos = async () => {
       if (!shouldIncludeServicos) return;
 
+      // 1) Chamados (serviços) - lista existente
+
       const chamadoWhere = {
         ...(query
           ? {
@@ -510,6 +512,111 @@ exports.getFeed = async (req, res) => {
                 tipo: author.tipo,
               }
             : null,
+        });
+      }
+
+      // 2) Publicações de serviço (Post.postType = 'servico')
+      // Mantemos como type='post' para reaproveitar lógica do frontend (editar/excluir/curtir/comentar)
+      // e também para aparecer corretamente no feed.
+      const postWhere = {
+        isHidden: false,
+        postType: 'servico',
+        ...(query
+          ? {
+              [Op.or]: [
+                { texto: { [Op.like]: `%${query}%` } },
+                { serviceCategory: { [Op.like]: `%${query}%` } },
+                { serviceLocation: { [Op.like]: `%${query}%` } },
+                { serviceWhatsapp: { [Op.like]: `%${query}%` } },
+              ],
+            }
+          : {}),
+      };
+
+      const posts = await Post.findAll({
+        where: postWhere,
+        include: [
+          {
+            model: User,
+            as: 'author',
+            attributes: ['id', 'nome', 'tipo', 'foto', 'logo'],
+          },
+        ],
+        order: [['createdAt', 'DESC']],
+        limit: perTypeLimit,
+        offset: perTypeOffset,
+      });
+
+      const postIds = posts.map(p => p.id);
+
+      const [reactionCounts, commentCounts, myReactions] = await Promise.all([
+        postIds.length
+          ? PostReaction.findAll({
+              attributes: ['postId', [PostReaction.sequelize.fn('COUNT', PostReaction.sequelize.col('id')), 'count']],
+              where: { postId: postIds },
+              group: ['postId'],
+              raw: true,
+            })
+          : Promise.resolve([]),
+        postIds.length
+          ? PostComment.findAll({
+              attributes: ['postId', [PostComment.sequelize.fn('COUNT', PostComment.sequelize.col('id')), 'count']],
+              where: { postId: postIds },
+              group: ['postId'],
+              raw: true,
+            })
+          : Promise.resolve([]),
+        req.user && postIds.length
+          ? PostReaction.findAll({
+              attributes: ['postId'],
+              where: { postId: postIds, userId: req.user.id },
+              raw: true,
+            })
+          : Promise.resolve([]),
+      ]);
+
+      const reactionMap = Object.fromEntries(reactionCounts.map(r => [String(r.postId), Number(r.count) || 0]));
+      const commentMap = Object.fromEntries(commentCounts.map(r => [String(r.postId), Number(r.count) || 0]));
+      const myLikedSet = new Set(myReactions.map(r => String(r.postId)));
+
+      for (const p of posts) {
+        const raw = typeof p.toJSON === 'function' ? p.toJSON() : p;
+        const author = raw.author || null;
+        const avatarUrl = author?.tipo === 'empresa'
+          ? toAbsolute(req, author.logo)
+          : toAbsolute(req, author.foto);
+
+        items.push({
+          type: 'post',
+          id: raw.id,
+          userId: raw.userId,
+          createdAt: raw.createdAt,
+          dataPublicacao: raw.createdAt,
+          nome: author?.nome || 'Usuário',
+          texto: raw.texto,
+          imageUrl: toAbsolute(req, raw.imageUrl),
+          postType: raw.postType,
+          servicePrice: raw.servicePrice,
+          serviceCategory: raw.serviceCategory,
+          serviceLocation: raw.serviceLocation,
+          serviceWhatsapp: raw.serviceWhatsapp,
+          ctaText: raw.ctaText,
+          ctaUrl: raw.ctaUrl,
+          avatarUrl,
+          author: author
+            ? {
+                id: author.id,
+                nome: author.nome,
+                tipo: author.tipo,
+                foto: toAbsolute(req, author.foto),
+                logo: toAbsolute(req, author.logo),
+              }
+            : null,
+          likedByMe: req.user ? myLikedSet.has(String(raw.id)) : false,
+          counts: {
+            likes: reactionMap[String(raw.id)] || 0,
+            comments: commentMap[String(raw.id)] || 0,
+          },
         });
       }
     };

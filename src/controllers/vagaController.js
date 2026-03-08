@@ -25,6 +25,27 @@ exports.listarTodas = async (req, res) => {
     
     const vagas = await Vaga.findAndCountAll({
       where,
+      attributes: [
+        'id',
+        'titulo',
+        'descricao',
+        'salario',
+        'imagem',
+        'localizacao',
+        'tipoContrato',
+        'nivelExperiencia',
+        'modalidade',
+        'area',
+        'premium',
+        'dataPublicacao',
+        'dataExpiracao',
+        'empresaId',
+        'visualizacoes',
+        'capacidadeVagas',
+        'statusCapacidade',
+        'createdAt',
+        'updatedAt'
+      ],
       include: [
         {
           model: User,
@@ -89,17 +110,6 @@ exports.listarPorId = async (req, res) => {
           model: User,
           as: 'empresa',
           attributes: ['id', 'nome', 'logo', 'setor', 'tamanho', 'descricao', 'website']
-        },
-        {
-          model: Candidatura,
-          as: 'candidaturas',
-          include: [
-            {
-              model: User,
-              as: 'usuario',
-              attributes: ['id', 'nome', 'email', 'foto']
-            }
-          ]
         }
       ]
     });
@@ -107,14 +117,27 @@ exports.listarPorId = async (req, res) => {
     if (!vaga) {
       return res.status(404).json({ error: 'Vaga não encontrada' });
     }
-    
-    // Atualizar status da capacidade baseado nos aprovados
-    await exports.atualizarStatusCapacidade(id);
+
+    const [candidaturasCount, aprovadosCount] = await Promise.all([
+      Candidatura.count({ where: { vagaId: id } }),
+      Candidatura.count({ where: { vagaId: id, fase: { [Op.in]: ['aprovada', 'contratada'] } } })
+    ]);
+
+    let candidatadoByMe = false;
+    if (req.user && req.user.tipo === 'usuario') {
+      const ja = await Candidatura.count({ where: { vagaId: id, usuarioId: req.user.id } });
+      candidatadoByMe = ja > 0;
+    }
     
     // Incrementar visualizações
     await vaga.increment('visualizacoes');
     
-    res.json(vaga);
+    res.json({
+      ...vaga.toJSON(),
+      candidaturasCount,
+      aprovadosCount,
+      candidatadoByMe
+    });
   } catch (error) {
     console.error('Erro ao buscar vaga:', error);
     res.status(500).json({ error: 'Erro ao buscar vaga' });
@@ -314,6 +337,16 @@ exports.listarPorEmpresa = async (req, res) => {
     
     const vagas = await Vaga.findAll({
       where: { empresaId },
+      attributes: {
+        include: [
+          [
+            Vaga.sequelize.literal(
+              '(SELECT COUNT(*) FROM candidaturas AS c WHERE c."vagaId" = "Vaga"."id")'
+            ),
+            'candidaturas'
+          ]
+        ]
+      },
       include: [
         {
           model: User,
@@ -324,20 +357,7 @@ exports.listarPorEmpresa = async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
 
-    // Adicionar contagem de candidaturas para cada vaga
-    const vagasComCandidaturas = await Promise.all(
-      vagas.map(async (vaga) => {
-        const candidaturas = await Candidatura.count({
-          where: { vagaId: vaga.id }
-        });
-        return {
-          ...vaga.toJSON(),
-          candidaturas: candidaturas
-        };
-      })
-    );
-
-    res.json(vagasComCandidaturas);
+    res.json(vagas);
   } catch (error) {
     console.error('Erro ao listar vagas da empresa:', error);
     res.status(500).json({ error: 'Erro ao listar vagas da empresa' });
@@ -360,6 +380,27 @@ exports.buscarPorEmpresa = async (req, res) => {
           ]
         }
       },
+      attributes: [
+        'id',
+        'titulo',
+        'descricao',
+        'salario',
+        'imagem',
+        'localizacao',
+        'tipoContrato',
+        'nivelExperiencia',
+        'modalidade',
+        'area',
+        'premium',
+        'dataPublicacao',
+        'dataExpiracao',
+        'empresaId',
+        'visualizacoes',
+        'capacidadeVagas',
+        'statusCapacidade',
+        'createdAt',
+        'updatedAt'
+      ],
       include: [
         {
           model: User,

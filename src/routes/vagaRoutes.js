@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const vagaController = require('../controllers/vagaController');
-const { authMiddleware, empresaMiddleware } = require('../middlewares/auth');
+const { authMiddleware, empresaMiddleware, optionalAuthMiddleware } = require('../middlewares/auth');
 const { uploadImagem } = require('../middlewares/upload');
 
 // Rotas públicas (não precisam de autenticação)
 router.get('/', vagaController.listarTodas);
-router.get('/:id', vagaController.listarPorId);
+router.get('/:id', optionalAuthMiddleware, vagaController.listarPorId);
 
 // Rotas protegidas (precisam de autenticação)
 router.use(authMiddleware); // Todas as rotas abaixo precisam de autenticação

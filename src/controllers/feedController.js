@@ -132,7 +132,10 @@ exports.getFeed = async (req, res) => {
 
     const pageNum = Math.max(parseInt(page, 10) || 1, 1);
     const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 50);
-    const offset = (pageNum - 1) * limitNum;
+    // tab=todos junta múltiplos tipos (posts/vagas/servicos/vendas). Se usarmos limitNum para cada tipo,
+    // acabamos buscando 4x mais dados que o necessário, aumentando muito o tempo de resposta.
+    const perTypeLimit = tab === 'todos' ? Math.max(1, Math.ceil(limitNum / 2)) : limitNum;
+    const perTypeOffset = (pageNum - 1) * perTypeLimit;
 
     const query = String(q || '').trim();
 
@@ -166,8 +169,8 @@ exports.getFeed = async (req, res) => {
           },
         ],
         order: [['createdAt', 'DESC']],
-        limit: limitNum,
-        offset,
+        limit: perTypeLimit,
+        offset: perTypeOffset,
       });
 
       const postIds = posts.map(p => p.id);
@@ -267,8 +270,8 @@ exports.getFeed = async (req, res) => {
           },
         ],
         order: [['createdAt', 'DESC']],
-        limit: limitNum,
-        offset,
+        limit: perTypeLimit,
+        offset: perTypeOffset,
       });
 
       const produtoIds = produtos.map(p => p.id);
@@ -407,8 +410,8 @@ exports.getFeed = async (req, res) => {
       const companies = await User.findAll({
         where: companyWhere,
         order: [['createdAt', 'DESC']],
-        limit: limitNum,
-        offset,
+        limit: perTypeLimit,
+        offset: perTypeOffset,
       });
 
       for (const u of companies) {
@@ -451,8 +454,8 @@ exports.getFeed = async (req, res) => {
           },
         ],
         order: [['data', 'DESC']],
-        limit: limitNum,
-        offset,
+        limit: perTypeLimit,
+        offset: perTypeOffset,
       });
 
       for (const c of chamados) {
@@ -529,8 +532,8 @@ exports.getFeed = async (req, res) => {
           },
         ],
         order: [['createdAt', 'DESC']],
-        limit: limitNum,
-        offset,
+        limit: perTypeLimit,
+        offset: perTypeOffset,
       });
 
       for (const v of vagas) {
@@ -578,8 +581,8 @@ exports.getFeed = async (req, res) => {
       const users = await User.findAll({
         where: userWhere,
         order: [['createdAt', 'DESC']],
-        limit: limitNum,
-        offset,
+        limit: perTypeLimit,
+        offset: perTypeOffset,
       });
 
       for (const u of users) {

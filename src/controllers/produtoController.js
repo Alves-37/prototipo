@@ -626,6 +626,22 @@ exports.create = async (req, res) => {
     });
   } catch (err) {
     console.error('Erro ao criar produto:', err);
+    try {
+      const name = String(err?.name || '')
+      if (name === 'SequelizeValidationError') {
+        const msg = Array.isArray(err?.errors) && err.errors[0]?.message ? String(err.errors[0].message) : 'Produto inválido'
+        return res.status(400).json({ error: msg })
+      }
+
+      if (name === 'SequelizeDatabaseError') {
+        const rawMsg = String(err?.original?.message || err?.message || '')
+        const lower = rawMsg.toLowerCase()
+        if (lower.includes('unknown column') || lower.includes('does not exist') || lower.includes('column') && lower.includes('exist')) {
+          return res.status(500).json({ error: 'Erro interno: base de dados desatualizada (migração pendente)' })
+        }
+      }
+    } catch {}
+
     return res.status(500).json({ error: 'Erro ao criar produto' });
   }
 };
@@ -714,6 +730,22 @@ exports.update = async (req, res) => {
     });
   } catch (err) {
     console.error('Erro ao atualizar produto:', err);
+    try {
+      const name = String(err?.name || '')
+      if (name === 'SequelizeValidationError') {
+        const msg = Array.isArray(err?.errors) && err.errors[0]?.message ? String(err.errors[0].message) : 'Produto inválido'
+        return res.status(400).json({ error: msg })
+      }
+
+      if (name === 'SequelizeDatabaseError') {
+        const rawMsg = String(err?.original?.message || err?.message || '')
+        const lower = rawMsg.toLowerCase()
+        if (lower.includes('unknown column') || lower.includes('does not exist') || lower.includes('column') && lower.includes('exist')) {
+          return res.status(500).json({ error: 'Erro interno: base de dados desatualizada (migração pendente)' })
+        }
+      }
+    } catch {}
+
     return res.status(500).json({ error: 'Erro ao atualizar produto' });
   }
 };

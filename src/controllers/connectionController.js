@@ -58,11 +58,15 @@ exports.request = async (req, res) => {
   try {
     const me = req.user.id;
     const other = normalizeId(req.params.targetId);
+    console.log('Connection request:', { me, other });
     if (!other) return res.status(400).json({ error: 'ID inválido' });
     if (other === me) return res.status(400).json({ error: 'Operação inválida' });
 
     const otherUser = await User.findByPk(other);
-    if (!otherUser) return res.status(404).json({ error: 'Usuário não encontrado' });
+    if (!otherUser) {
+      console.log('Usuário não encontrado:', other);
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
 
     const acceptedOutgoing = await Connection.findOne({ where: { requesterId: me, addresseeId: other, status: 'accepted' } });
     const acceptedIncoming = await Connection.findOne({ where: { requesterId: other, addresseeId: me, status: 'accepted' } });

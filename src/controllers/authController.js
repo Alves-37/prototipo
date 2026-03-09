@@ -132,13 +132,29 @@ exports.register = async (req, res) => {
 
 exports.login = async (req, res) => {
   try {
-    const { email, senha } = req.body;
+    const { email, senha, tipo } = req.body;
     if (!email || !senha) {
       return res.status(400).json({ error: 'Preencha email e senha.' });
     }
     const user = await User.findOne({ where: { email } });
     if (!user) {
       return res.status(404).json({ error: 'Usuário não encontrado.' });
+    }
+
+    // Se o frontend informou o tipo esperado, validar contra o tipo real da conta
+    if (tipo !== undefined && tipo !== null && String(tipo).trim() !== '') {
+      if (!['usuario', 'empresa'].includes(tipo)) {
+        return res.status(400).json({ error: 'Tipo de usuário inválido.' });
+      }
+      if (user.tipo !== tipo) {
+        return res.status(403).json({
+          error: 'Tipo de conta incorreto.',
+          message: 'Você selecionou um tipo de conta diferente do cadastro. Selecione o tipo correto e tente novamente.',
+          wrongType: true,
+          expectedType: tipo,
+          actualType: user.tipo,
+        });
+      }
     }
     
     // Verificar se a conta está desativada/suspensa -> bloquear sempre

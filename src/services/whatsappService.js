@@ -23,6 +23,12 @@ class WhatsAppService {
 
   setupCallMeBot() {
     // CallMeBot é gratuito e não precisa de API key
+    if (!process.env.CALLMEBOT_APIKEY) {
+      console.log('[WhatsAppService] CALLMEBOT_APIKEY não configurada - CallMeBot requer apikey');
+      this.enabled = false;
+      return;
+    }
+
     this.enabled = true;
     console.log('[WhatsAppService] Serviço habilitado com CallMeBot (grátis)');
   }
@@ -60,10 +66,17 @@ class WhatsAppService {
     return new Promise((resolve, reject) => {
       // CallMeBot - serviço gratuito
       // Limitações: 1 mensagem a cada 10 segundos, máximo 20 mensagens por dia
-      
-      const cleanPhone = phoneNumber.replace('+', '');
+
+      const apiKey = process.env.CALLMEBOT_APIKEY
+      if (!apiKey) {
+        console.error('[WhatsAppService] CALLMEBOT_APIKEY ausente');
+        resolve(false);
+        return;
+      }
+
+      const encodedPhone = encodeURIComponent(phoneNumber);
       const encodedMessage = encodeURIComponent(message);
-      const url = `https://api.callmebot.com/whatsapp.php?phone=${cleanPhone}&text=${encodedMessage}`;
+      const url = `https://api.callmebot.com/whatsapp.php?phone=${encodedPhone}&text=${encodedMessage}&apikey=${encodeURIComponent(apiKey)}`;
 
       const req = https.get(url, (res) => {
         let data = '';

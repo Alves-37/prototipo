@@ -118,21 +118,40 @@ Se você não solicitou esta recuperação, ignore esta mensagem.`;
    */
   validatePhoneNumber(phone) {
     if (!phone) return null;
-    
-    // Remove todos os caracteres não numéricos
-    let cleaned = phone.replace(/\D/g, '');
-    
-    // Verifica se é um número brasileiro (10 ou 11 dígitos)
-    if (cleaned.length === 10 || cleaned.length === 11) {
-      return `+55${cleaned}`;
-    }
-    
-    // Se já começa com +, mantém
-    if (phone.startsWith('+')) {
-      return phone;
-    }
-    
-    return null;
+ 
+     // Se já está em E.164 (+XXXXXXXX...), valida de forma básica
+     // (8 a 15 dígitos é o padrão do E.164)
+     const raw = String(phone).trim()
+     if (raw.startsWith('+')) {
+       const digits = raw.replace(/\D/g, '')
+       if (digits.length >= 8 && digits.length <= 15) {
+         return `+${digits}`
+       }
+       return null
+     }
+ 
+     // Remove todos os caracteres não numéricos
+     const cleaned = raw.replace(/\D/g, '')
+ 
+     // Moçambique (9 dígitos local) -> +258XXXXXXXXX
+     // Também aceita já com 258 (12 dígitos)
+     if (cleaned.length === 9) {
+       return `+258${cleaned}`
+     }
+     if (cleaned.length === 12 && cleaned.startsWith('258')) {
+       return `+${cleaned}`
+     }
+ 
+     // Brasil (10 ou 11 dígitos local) -> +55XXXXXXXXXXX
+     // Também aceita já com 55 (12 ou 13 dígitos)
+     if (cleaned.length === 10 || cleaned.length === 11) {
+       return `+55${cleaned}`
+     }
+     if ((cleaned.length === 12 || cleaned.length === 13) && cleaned.startsWith('55')) {
+       return `+${cleaned}`
+     }
+ 
+     return null
   }
 
   /**

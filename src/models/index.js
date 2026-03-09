@@ -20,9 +20,10 @@ require('./Connection');
 require('./Produto');
 require('./ProdutoReaction');
 require('./ProdutoComment');
+require('./PasswordResetToken');
 
 // Recupera instâncias a partir do registry do Sequelize
-const { User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, Post, PostReaction, PostComment, Connection, Produto, ProdutoReaction, ProdutoComment } = sequelize.models;
+const { User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, Post, PostReaction, PostComment, Connection, Produto, ProdutoReaction, ProdutoComment, PasswordResetToken } = sequelize.models;
 
 if (!User || !Vaga) {
   console.error('[Models] Registry incompleto. Disponíveis:', Object.keys(sequelize.models || {}));
@@ -115,6 +116,10 @@ ProdutoComment.belongsTo(Produto, { foreignKey: 'produtoId', as: 'produto' });
 User.hasMany(ProdutoComment, { foreignKey: 'userId', as: 'produtoComments' });
 ProdutoComment.belongsTo(User, { foreignKey: 'userId', as: 'author' });
 
+// Associações de tokens de redefinição de senha
+User.hasMany(PasswordResetToken, { foreignKey: 'userId', as: 'passwordResetTokens' });
+PasswordResetToken.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
 const syncDb = async () => {
   try {
     if (process.env.NODE_ENV === 'production') {
@@ -156,4 +161,4 @@ const syncDb = async () => {
   }
 };
 
-module.exports = { sequelize, User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, Post, PostReaction, PostComment, Connection, Produto, ProdutoReaction, ProdutoComment, syncDb };
+module.exports = { sequelize, User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, Post, PostReaction, PostComment, Connection, Produto, ProdutoReaction, ProdutoComment, PasswordResetToken, syncDb };

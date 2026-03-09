@@ -19,32 +19,43 @@ if (!connectionUri) {
 }
 
 const normalizedUri = connectionUri.trim();
-const sslEnv = process.env.DATABASE_SSL;
-const useSSL =
-  sslEnv === 'true'
-    ? true
-    : sslEnv === 'false'
-    ? false
-    : !normalizedUri.includes('postgres.railway.internal');
 
-sequelize = new Sequelize(normalizedUri, {
-  dialect: 'postgres',
-  protocol: 'postgres',
-  logging: false,
-  dialectOptions: useSSL
-    ? {
-        ssl: {
-          require: true,
-          rejectUnauthorized: false,
-        },
-      }
-    : {},
-  pool: {
-    max: 10,
-    min: 0,
-    acquire: 30000,
-    idle: 10000,
-  },
-});
+// Check if using SQLite for local development
+if (normalizedUri.startsWith('sqlite:')) {
+  sequelize = new Sequelize(normalizedUri, {
+    dialect: 'sqlite',
+    storage: normalizedUri.replace('sqlite:', ''),
+    logging: console.log, // Enable logging for SQLite
+  });
+} else {
+  // PostgreSQL configuration
+  const sslEnv = process.env.DATABASE_SSL;
+  const useSSL =
+    sslEnv === 'true'
+      ? true
+      : sslEnv === 'false'
+      ? false
+      : !normalizedUri.includes('postgres.railway.internal');
+
+  sequelize = new Sequelize(normalizedUri, {
+    dialect: 'postgres',
+    protocol: 'postgres',
+    logging: false,
+    dialectOptions: useSSL
+      ? {
+          ssl: {
+            require: true,
+            rejectUnauthorized: false,
+          },
+        }
+      : {},
+    pool: {
+      max: 10,
+      min: 0,
+      acquire: 30000,
+      idle: 10000,
+    },
+  });
+}
 
 module.exports = sequelize;

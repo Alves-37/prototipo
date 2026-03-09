@@ -1,11 +1,9 @@
-const twilio = require('twilio');
-const axios = require('axios');
+const https = require('https');
 
 class WhatsAppService {
   constructor() {
-    this.client = null;
     this.enabled = false;
-    this.provider = process.env.WHATSAPP_PROVIDER || 'twilio'; // twilio, callmebot, development
+    this.provider = process.env.WHATSAPP_PROVIDER || 'development';
     
     // Configurar baseado no provider
     this.setupProvider();
@@ -13,29 +11,13 @@ class WhatsAppService {
 
   setupProvider() {
     switch (this.provider) {
-      case 'twilio':
-        this.setupTwilio();
-        break;
       case 'callmebot':
         this.setupCallMeBot();
         break;
-      case 'ultramsg':
-        this.setupUltraMsg();
-        break;
+      case 'development':
       default:
         console.log('[WhatsAppService] Usando modo desenvolvimento');
         this.enabled = false;
-    }
-  }
-
-  setupTwilio() {
-    if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_NUMBER) {
-      this.client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-      this.enabled = true;
-      console.log('[WhatsAppService] Serviço habilitado com Twilio');
-    } else {
-      console.log('[WhatsAppService] Credenciais Twilio não configuradas');
-      this.enabled = false;
     }
   }
 
@@ -43,16 +25,6 @@ class WhatsAppService {
     // CallMeBot é gratuito e não precisa de API key
     this.enabled = true;
     console.log('[WhatsAppService] Serviço habilitado com CallMeBot (grátis)');
-  }
-
-  setupUltraMsg() {
-    if (process.env.ULTRAMSG_INSTANCE_ID && process.env.ULTRAMSG_TOKEN) {
-      this.enabled = true;
-      console.log('[WhatsAppService] Serviço habilitado com UltraMsg');
-    } else {
-      console.log('[WhatsAppService] Credenciais UltraMsg não configuradas');
-      this.enabled = false;
-    }
   }
 
   /**
@@ -72,12 +44,8 @@ class WhatsAppService {
       const message = this.formatVerificationMessage(code, userName);
       
       switch (this.provider) {
-        case 'twilio':
-          return await this.sendViaTwilio(phoneNumber, message);
         case 'callmebot':
           return await this.sendViaCallMeBot(phoneNumber, message);
-        case 'ultramsg':
-          return await this.sendViaUltraMsg(phoneNumber, message);
         default:
           console.log(`[WhatsAppService] Provider ${this.provider} não implementado`);
           return false;
@@ -88,49 +56,44 @@ class WhatsAppService {
     }
   }
 
-  async sendViaTwilio(phoneNumber, message) {
-    await this.client.messages.create({
-      body: message,
-      from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
-      to: `whatsapp:${phoneNumber}`
-    });
-    console.log(`[WhatsAppService] Código enviado via Twilio para ${phoneNumber}`);
-    return true;
-  }
-
   async sendViaCallMeBot(phoneNumber, message) {
-    // CallMeBot - serviço gratuito
-    // Limitações: 1 mensagem a cada 10 segundos, máximo 20 mensagens por dia
-    const url = `https://api.callmebot.com/whatsapp.php?phone=${phoneNumber.replace('+', '')}&text=${encodeURIComponent(message)}`;
-    
-    const response = await axios.get(url);
-    if (response.data.includes('Message sent')) {
-      console.log(`[WhatsAppService] Código enviado via CallMeBot para ${phoneNumber}`);
-      return true;
-    } else {
-      console.error('[WhatsAppService] Erro CallMeBot:', response.data);
-      return false;
-    }
-  }
+    return new Promise((resolve, reject) => {
+      // CallMeBot - serviço gratuito
+      // Limitações: 1 mensagem a cada 10 segundos, máximo 20 mensagens por dia
+      
+      const cleanPhone = phoneNumber.replace('+', '');
+      const encodedMessage = encodeURIComponent(message);
+      const url = `https://api.callmebot.com/whatsapp.php?phone=${cleanPhone}&text=${encodedMessage}`;
 
-  async sendViaUltraMsg(phoneNumber, message) {
-    // UltraMsg - tem plano gratuito
-    const url = `https://api.ultramsg.com/${process.env.ULTRAMSG_INSTANCE_ID}/messages/chat`;
-    
-    const data = {
-      token: process.env.ULTRAMSG_TOKEN,
-      to: phoneNumber,
-      body: message
-    };
+      const req = https.get(url, (res) => {
+        let data = '';
+        
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        
+        res.on('end', () => {
+          if (data.includes('Message sent') || data.includes('OK')) {
+            console.log(`[WhatsAppService] Código enviado via CallMeBot para ${phoneNumber}`);
+            resolve(true);
+          } else {
+            console.error('[WhatsAppService] Erro CallMeBot:', data);
+            resolve(false);
+          }
+        });
+      });
 
-    const response = await axios.post(url, data);
-    if (response.data.status === 'sent') {
-      console.log(`[WhatsAppService] Código enviado via UltraMsg para ${phoneNumber}`);
-      return true;
-    } else {
-      console.error('[WhatsAppService] Erro UltraMsg:', response.data);
-      return false;
-    }
+      req.on('error', (err) => {
+        console.error('[WhatsAppService] Erro requisição CallMeBot:', err);
+        resolve(false);
+      });
+
+      req.setTimeout(10000, () => {
+        req.destroy();
+        console.error('[WhatsAppService] Timeout CallMeBot');
+        resolve(false);
+      });
+    });
   }
 
   /**

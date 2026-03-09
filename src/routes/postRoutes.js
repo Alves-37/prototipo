@@ -7,6 +7,7 @@ const { authMiddleware } = require('../middlewares/auth');
 router.get('/', postController.list);
 router.get('/:id/comments', postController.listComments);
 router.get('/:id/likes', postController.listLikes);
+router.post('/:id/view', postController.registerView);
 
 // Protegido
 router.post('/', authMiddleware, postController.create);
@@ -16,5 +17,6 @@ router.post('/:id/like', authMiddleware, postController.toggleLike);
 router.post('/:id/comments', authMiddleware, postController.addComment);
 router.put('/:id/comments/:commentId', authMiddleware, postController.updateComment);
 router.delete('/:id/comments/:commentId', authMiddleware, postController.removeComment);
+router.get('/company/metrics', authMiddleware, postController.getCompanyPostMetrics);
 
 module.exports = router;

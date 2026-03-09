@@ -1,4 +1,4 @@
-const { Post, PostReaction, PostComment, User, Notificacao } = require('../models');
+const { Post, PostReaction, PostComment, PostView, User, Notificacao } = require('../models');
 
 const getPublicBaseUrl = (req) => {
   try {
@@ -735,5 +735,116 @@ exports.removeComment = async (req, res) => {
   } catch (err) {
     console.error('Erro ao eliminar comentário:', err);
     return res.status(500).json({ error: 'Erro ao eliminar comentário' });
+  }
+};
+
+exports.registerView = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const post = await Post.findByPk(id);
+    if (!post) return res.status(404).json({ error: 'Post não encontrado' });
+
+    const forwarded = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+    const ip = forwarded || req.ip || null;
+
+    const viewerUserId = req.user?.id ? Number(req.user.id) : null;
+    await PostView.create({
+      postId: Number(id),
+      viewerUserId,
+      viewerIp: ip ? String(ip).slice(0, 120) : null,
+    });
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao registrar visualização:', err);
+    return res.status(500).json({ error: 'Erro ao registrar visualização' });
+  }
+};
+
+exports.getCompanyPostMetrics = async (req, res) => {
+  try {
+    const me = req.user;
+    if (!me || me.tipo !== 'empresa') {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+
+    const posts = await Post.findAll({
+      where: { userId: me.id, isHidden: false },
+      order: [['createdAt', 'DESC']],
+      attributes: ['id', 'texto', 'imageUrl', 'postType', 'createdAt'],
+    });
+
+    const postIds = posts.map(p => p.id);
+
+    const reactionsByType = postIds.length
+      ? await PostReaction.findAll({
+          attributes: [
+            'postId',
+            'type',
+            [PostReaction.sequelize.fn('COUNT', PostReaction.sequelize.col('id')), 'count'],
+          ],
+          where: { postId: postIds },
+          group: ['postId', 'type'],
+          raw: true,
+        })
+      : [];
+
+    const viewsCounts = postIds.length
+      ? await PostView.findAll({
+          attributes: [
+            'postId',
+            [PostView.sequelize.fn('COUNT', PostView.sequelize.col('id')), 'count'],
+          ],
+          where: { postId: postIds },
+          group: ['postId'],
+          raw: true,
+        })
+      : [];
+
+    const viewsMap = Object.fromEntries(viewsCounts.map(v => [String(v.postId), Number(v.count) || 0]));
+
+    const reactionTypeMap = new Map();
+    reactionsByType.forEach(r => {
+      const postId = String(r.postId);
+      const type = String(r.type || 'like');
+      const count = Number(r.count) || 0;
+      const prev = reactionTypeMap.get(postId) || {};
+      reactionTypeMap.set(postId, { ...prev, [type]: count });
+    });
+
+    const items = posts.map(p => {
+      const raw = typeof p.toJSON === 'function' ? p.toJSON() : p;
+      const reactions = reactionTypeMap.get(String(raw.id)) || {};
+      const reactionsTotal = Object.values(reactions).reduce((sum, n) => sum + (Number(n) || 0), 0);
+      const views = viewsMap[String(raw.id)] || 0;
+
+      return {
+        id: raw.id,
+        postType: raw.postType,
+        texto: raw.texto,
+        imageUrl: toAbsolute(req, raw.imageUrl),
+        createdAt: raw.createdAt,
+        metrics: {
+          reactionsTotal,
+          reactions,
+          views,
+        },
+      };
+    });
+
+    const totals = items.reduce(
+      (acc, it) => {
+        acc.posts += 1;
+        acc.reactions += Number(it.metrics?.reactionsTotal || 0);
+        acc.views += Number(it.metrics?.views || 0);
+        return acc;
+      },
+      { posts: 0, reactions: 0, views: 0 }
+    );
+
+    return res.json({ totals, posts: items });
+  } catch (err) {
+    console.error('Erro ao buscar métricas de posts da empresa:', err);
+    return res.status(500).json({ error: 'Erro ao buscar métricas de posts da empresa' });
   }
 };

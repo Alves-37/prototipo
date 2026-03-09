@@ -16,6 +16,7 @@ require('./PushSubscription');
 require('./Post');
 require('./PostReaction');
 require('./PostComment');
+require('./PostView');
 require('./Connection');
 require('./Produto');
 require('./ProdutoReaction');
@@ -23,7 +24,7 @@ require('./ProdutoComment');
 require('./PasswordResetToken');
 
 // Recupera instâncias a partir do registry do Sequelize
-const { User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, Post, PostReaction, PostComment, Connection, Produto, ProdutoReaction, ProdutoComment, PasswordResetToken } = sequelize.models;
+const { User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, Post, PostReaction, PostComment, PostView, Connection, Produto, ProdutoReaction, ProdutoComment, PasswordResetToken } = sequelize.models;
 
 if (!User || !Vaga) {
   console.error('[Models] Registry incompleto. Disponíveis:', Object.keys(sequelize.models || {}));
@@ -96,6 +97,9 @@ PostComment.belongsTo(Post, { foreignKey: 'postId', as: 'post' });
 User.hasMany(PostComment, { foreignKey: 'userId', as: 'postComments' });
 PostComment.belongsTo(User, { foreignKey: 'userId', as: 'author' });
 
+Post.hasMany(PostView, { foreignKey: 'postId', as: 'views' });
+PostView.belongsTo(Post, { foreignKey: 'postId', as: 'post' });
+
 // Associações de conexões
 User.hasMany(Connection, { foreignKey: 'requesterId', as: 'connectionRequestsSent' });
 User.hasMany(Connection, { foreignKey: 'addresseeId', as: 'connectionRequestsReceived' });
@@ -161,4 +165,4 @@ const syncDb = async () => {
   }
 };
 
-module.exports = { sequelize, User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, Post, PostReaction, PostComment, Connection, Produto, ProdutoReaction, ProdutoComment, PasswordResetToken, syncDb };
+module.exports = { sequelize, User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, Post, PostReaction, PostComment, PostView, Connection, Produto, ProdutoReaction, ProdutoComment, PasswordResetToken, syncDb };

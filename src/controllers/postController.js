@@ -774,10 +774,14 @@ exports.getCompanyPostMetrics = async (req, res) => {
       return res.status(403).json({ error: 'Acesso negado' });
     }
 
+    const limitRaw = Number(req.query?.limit);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(200, Math.floor(limitRaw)) : 60;
+
     const posts = await Post.findAll({
       where: { userId: me.id, isHidden: false },
       order: [['createdAt', 'DESC']],
       attributes: ['id', 'texto', 'imageUrl', 'postType', 'createdAt'],
+      limit,
     });
 
     const postIds = posts.map(p => p.id);
@@ -838,15 +842,31 @@ exports.getCompanyPostMetrics = async (req, res) => {
       };
     });
 
-    const totals = items.reduce(
-      (acc, it) => {
-        acc.posts += 1;
-        acc.reactions += Number(it.metrics?.reactionsTotal || 0);
-        acc.views += Number(it.metrics?.views || 0);
-        return acc;
-      },
-      { posts: 0, reactions: 0, views: 0 }
+    const totalsPosts = await Post.count({ where: { userId: me.id, isHidden: false } });
+
+    const runCountQuery = async (sql) => {
+      const out = await Post.sequelize.query(sql, { replacements: { userId: Number(me.id) } });
+      const rows = Array.isArray(out) ? out[0] : out;
+      const first = Array.isArray(rows) && rows.length ? rows[0] : null;
+      const val = first ? (first.count ?? first.total ?? Object.values(first)[0]) : 0;
+      return Number(val) || 0;
+    };
+
+    const totalsReactions = await runCountQuery(
+      'SELECT COUNT(pr.id) AS count\n'
+      + 'FROM post_reactions pr\n'
+      + 'JOIN posts p ON p.id = pr.postId\n'
+      + 'WHERE p.userId = :userId AND p.isHidden = 0'
     );
+
+    const totalsViews = await runCountQuery(
+      'SELECT COUNT(pv.id) AS count\n'
+      + 'FROM post_views pv\n'
+      + 'JOIN posts p ON p.id = pv.postId\n'
+      + 'WHERE p.userId = :userId AND p.isHidden = 0'
+    );
+
+    const totals = { posts: totalsPosts, reactions: totalsReactions, views: totalsViews };
 
     return res.json({ totals, posts: items });
   } catch (err) {

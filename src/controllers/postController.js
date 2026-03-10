@@ -852,18 +852,37 @@ exports.getCompanyPostMetrics = async (req, res) => {
       return Number(val) || 0;
     };
 
+    const dialect = (() => {
+      try {
+        return String(Post.sequelize.getDialect ? Post.sequelize.getDialect() : '').toLowerCase();
+      } catch {
+        return '';
+      }
+    })();
+
+    const q = (id) => {
+      if (dialect === 'postgres') return `"${id}"`;
+      if (dialect === 'mariadb' || dialect === 'mysql') return `\`${id}\``;
+      return `"${id}"`;
+    };
+
+    const isHiddenExpr = (() => {
+      if (dialect === 'postgres') return `${q('isHidden')} = false`;
+      return `${q('isHidden')} = 0`;
+    })();
+
     const totalsReactions = await runCountQuery(
-      'SELECT COUNT(pr.id) AS count\n'
-      + 'FROM post_reactions pr\n'
-      + 'JOIN posts p ON p.id = pr.postId\n'
-      + 'WHERE p.userId = :userId AND p.isHidden = 0'
+      `SELECT COUNT(pr.${q('id')}) AS count\n`
+      + `FROM ${q('post_reactions')} pr\n`
+      + `JOIN ${q('posts')} p ON p.${q('id')} = pr.${q('postId')}\n`
+      + `WHERE p.${q('userId')} = :userId AND p.${isHiddenExpr}`
     );
 
     const totalsViews = await runCountQuery(
-      'SELECT COUNT(pv.id) AS count\n'
-      + 'FROM post_views pv\n'
-      + 'JOIN posts p ON p.id = pv.postId\n'
-      + 'WHERE p.userId = :userId AND p.isHidden = 0'
+      `SELECT COUNT(pv.${q('id')}) AS count\n`
+      + `FROM ${q('post_views')} pv\n`
+      + `JOIN ${q('posts')} p ON p.${q('id')} = pv.${q('postId')}\n`
+      + `WHERE p.${q('userId')} = :userId AND p.${isHiddenExpr}`
     );
 
     const totals = { posts: totalsPosts, reactions: totalsReactions, views: totalsViews };

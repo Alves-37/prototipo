@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const postController = require('../controllers/postController');
 const { authMiddleware } = require('../middlewares/auth');
+const { upload } = require('../middlewares/upload');
 
 // Público
 router.get('/', postController.list);
@@ -10,8 +11,8 @@ router.get('/:id/likes', postController.listLikes);
 router.post('/:id/view', postController.registerView);
 
 // Protegido
-router.post('/', authMiddleware, postController.create);
-router.put('/:id', authMiddleware, postController.update);
+router.post('/', authMiddleware, upload.single('media'), postController.create);
+router.put('/:id', authMiddleware, upload.single('media'), postController.update);
 router.delete('/:id', authMiddleware, postController.remove);
 router.post('/:id/like', authMiddleware, postController.toggleLike);
 router.post('/:id/comments', authMiddleware, postController.addComment);

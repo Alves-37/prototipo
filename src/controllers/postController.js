@@ -214,7 +214,9 @@ exports.create = async (req, res) => {
       return res.status(400).json({ error: mod.reason || 'Conteúdo não permitido' });
     }
     const t = mod.value;
-    const img = typeof imageUrl === 'string' ? imageUrl.trim() : '';
+    const imgFromBody = typeof imageUrl === 'string' ? imageUrl.trim() : '';
+    const imgFromFile = req.file && req.file.filename ? `/uploads/${req.file.filename}` : '';
+    const img = imgFromFile || imgFromBody;
 
     const svcPrice = typeof servicePrice === 'string' ? servicePrice.trim() : '';
     const svcCategory = typeof serviceCategory === 'string' ? serviceCategory.trim() : '';
@@ -341,6 +343,10 @@ exports.update = async (req, res) => {
     if (imageUrl !== undefined) {
       const img = typeof imageUrl === 'string' ? imageUrl.trim() : '';
       patch.imageUrl = img ? img : null;
+    }
+
+    if (req.file && req.file.filename) {
+      patch.imageUrl = `/uploads/${req.file.filename}`;
     }
 
     const nextTexto = Object.prototype.hasOwnProperty.call(patch, 'texto') ? patch.texto : post.texto;

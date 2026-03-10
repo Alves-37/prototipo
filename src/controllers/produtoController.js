@@ -624,7 +624,7 @@ exports.create = async (req, res) => {
       && !(Array.isArray(cloudUploaded) && cloudUploaded.length)
       && !String(process.env.UPLOAD_DIR || '').trim()
     ) {
-      return res.status(500).json({
+      return res.status(503).json({
         error: 'Uploads de produtos não estão persistentes em produção. Configure CLOUDINARY_* ou um volume persistente via UPLOAD_DIR.'
       });
     }
@@ -732,7 +732,7 @@ exports.update = async (req, res) => {
       && !(Array.isArray(cloudUploaded) && cloudUploaded.length)
       && !String(process.env.UPLOAD_DIR || '').trim()
     ) {
-      return res.status(500).json({
+      return res.status(503).json({
         error: 'Uploads de produtos não estão persistentes em produção. Configure CLOUDINARY_* ou um volume persistente via UPLOAD_DIR.'
       });
     }

@@ -617,18 +617,6 @@ exports.create = async (req, res) => {
 
     const files = Array.isArray(req.files) ? req.files : [];
     const cloudUploaded = await uploadLocalFilesToCloudinary(files, 'produtos');
-
-    if (
-      String(process.env.NODE_ENV || '').toLowerCase() === 'production'
-      && files.length
-      && !(Array.isArray(cloudUploaded) && cloudUploaded.length)
-      && !String(process.env.UPLOAD_DIR || '').trim()
-    ) {
-      return res.status(503).json({
-        error: 'Uploads de produtos não estão persistentes em produção. Configure CLOUDINARY_* ou um volume persistente via UPLOAD_DIR.'
-      });
-    }
-
     const imagens = Array.isArray(cloudUploaded) && cloudUploaded.length
       ? cloudUploaded
       : files.map(f => `/uploads/${f.filename}`);
@@ -725,18 +713,6 @@ exports.update = async (req, res) => {
 
     const files = Array.isArray(req.files) ? req.files : [];
     const cloudUploaded = await uploadLocalFilesToCloudinary(files, 'produtos');
-
-    if (
-      String(process.env.NODE_ENV || '').toLowerCase() === 'production'
-      && files.length
-      && !(Array.isArray(cloudUploaded) && cloudUploaded.length)
-      && !String(process.env.UPLOAD_DIR || '').trim()
-    ) {
-      return res.status(503).json({
-        error: 'Uploads de produtos não estão persistentes em produção. Configure CLOUDINARY_* ou um volume persistente via UPLOAD_DIR.'
-      });
-    }
-
     const novasImagens = Array.isArray(cloudUploaded) && cloudUploaded.length
       ? cloudUploaded
       : files.map(f => `/uploads/${f.filename}`);

@@ -1,6 +1,4 @@
 const { Post, PostReaction, PostComment, PostView, User, Notificacao } = require('../models');
-const path = require('path');
-const fs = require('fs');
 
 const getPublicBaseUrl = (req) => {
   try {
@@ -55,32 +53,6 @@ const toAbsolute = (req, maybePath) => {
   const baseUrl = getPublicBaseUrl(req);
   const path = f.startsWith('/') ? f : `/${f}`;
   return `${baseUrl}${path}`;
-};
-
-const resolveUploadDir = () => {
-  const fromEnv = process.env.UPLOAD_DIR;
-  if (fromEnv && String(fromEnv).trim()) {
-    return String(fromEnv).trim();
-  }
-  return path.join(__dirname, '../../uploads');
-};
-
-const uploadLocalFileToCloudinary = async (file, folder) => {
-  const cloudinary = require('../config/cloudinary');
-  if (!cloudinary) return null;
-  if (!file) return null;
-
-  const fullPath = file?.path || path.join(resolveUploadDir(), file.filename);
-  const mime = String(file?.mimetype || '');
-  const resourceType = mime.startsWith('video/') ? 'video' : 'image';
-  const result = await cloudinary.uploader.upload(fullPath, {
-    folder: `nevu/${folder}`,
-    resource_type: resourceType,
-  });
-
-  try { fs.unlinkSync(fullPath); } catch {}
-
-  return result?.secure_url ? String(result.secure_url) : null;
 };
 
 const publicAuthor = (req, user) => {
@@ -243,29 +215,7 @@ exports.create = async (req, res) => {
     }
     const t = mod.value;
     const imgFromBody = typeof imageUrl === 'string' ? imageUrl.trim() : '';
-
-    const isProd = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
-    const hasFile = !!(req.file && req.file.filename);
-    if (isProd && hasFile && !String(process.env.UPLOAD_DIR || '').trim()) {
-      const cloudinary = require('../config/cloudinary');
-      if (!cloudinary) {
-        return res.status(500).json({
-          error: 'Uploads de mídia não estão persistentes em produção. Configure CLOUDINARY_* ou um volume persistente via UPLOAD_DIR.'
-        });
-      }
-    }
-
-    let imgFromFile = '';
-    if (hasFile) {
-      try {
-        const cloudUrl = await uploadLocalFileToCloudinary(req.file, 'posts');
-        imgFromFile = cloudUrl ? cloudUrl : `/uploads/${req.file.filename}`;
-      } catch (e) {
-        console.error('Falha ao enviar mídia do post ao Cloudinary:', e);
-        imgFromFile = `/uploads/${req.file.filename}`;
-      }
-    }
-
+    const imgFromFile = req.file && req.file.filename ? `/uploads/${req.file.filename}` : '';
     const img = imgFromFile || imgFromBody;
 
     const svcPrice = typeof servicePrice === 'string' ? servicePrice.trim() : '';
@@ -395,25 +345,8 @@ exports.update = async (req, res) => {
       patch.imageUrl = img ? img : null;
     }
 
-    const isProd = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
-    const hasFile = !!(req.file && req.file.filename);
-    if (isProd && hasFile && !String(process.env.UPLOAD_DIR || '').trim()) {
-      const cloudinary = require('../config/cloudinary');
-      if (!cloudinary) {
-        return res.status(500).json({
-          error: 'Uploads de mídia não estão persistentes em produção. Configure CLOUDINARY_* ou um volume persistente via UPLOAD_DIR.'
-        });
-      }
-    }
-
-    if (hasFile) {
-      try {
-        const cloudUrl = await uploadLocalFileToCloudinary(req.file, 'posts');
-        patch.imageUrl = cloudUrl ? cloudUrl : `/uploads/${req.file.filename}`;
-      } catch (e) {
-        console.error('Falha ao enviar mídia do post ao Cloudinary:', e);
-        patch.imageUrl = `/uploads/${req.file.filename}`;
-      }
+    if (req.file && req.file.filename) {
+      patch.imageUrl = `/uploads/${req.file.filename}`;
     }
 
     const nextTexto = Object.prototype.hasOwnProperty.call(patch, 'texto') ? patch.texto : post.texto;

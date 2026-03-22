@@ -7,9 +7,10 @@ router.use(authMiddleware);
 
 router.get('/status/:targetId', connectionController.getStatus);
 router.get('/requests', connectionController.listIncoming);
-router.post('/:targetId', connectionController.request);
+// Rotas específicas antes de `/:targetId`, para nunca interpretar "accept"/"reject" como ID de utilizador
 router.post('/:id/accept', connectionController.accept);
 router.post('/:id/reject', connectionController.reject);
+router.post('/:targetId', connectionController.request);
 router.delete('/:targetId', connectionController.remove);
 
 module.exports = router;

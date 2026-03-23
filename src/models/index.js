@@ -17,6 +17,7 @@ require('./Post');
 require('./PostReaction');
 require('./PostComment');
 require('./PostView');
+require('./PostFeedback');
 require('./Connection');
 require('./Produto');
 require('./ProdutoReaction');
@@ -24,7 +25,7 @@ require('./ProdutoComment');
 require('./PasswordResetToken');
 
 // Recupera instâncias a partir do registry do Sequelize
-const { User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, Post, PostReaction, PostComment, PostView, Connection, Produto, ProdutoReaction, ProdutoComment, PasswordResetToken } = sequelize.models;
+const { User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, Post, PostReaction, PostComment, PostView, PostFeedback, Connection, Produto, ProdutoReaction, ProdutoComment, PasswordResetToken } = sequelize.models;
 
 if (!User || !Vaga) {
   console.error('[Models] Registry incompleto. Disponíveis:', Object.keys(sequelize.models || {}));
@@ -100,6 +101,11 @@ PostComment.belongsTo(User, { foreignKey: 'userId', as: 'author' });
 Post.hasMany(PostView, { foreignKey: 'postId', as: 'views' });
 PostView.belongsTo(Post, { foreignKey: 'postId', as: 'post' });
 
+Post.hasMany(PostFeedback, { foreignKey: 'postId', as: 'feedback' });
+PostFeedback.belongsTo(Post, { foreignKey: 'postId', as: 'post' });
+User.hasMany(PostFeedback, { foreignKey: 'userId', as: 'postFeedback' });
+PostFeedback.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
 // Associações de conexões
 User.hasMany(Connection, { foreignKey: 'requesterId', as: 'connectionRequestsSent' });
 User.hasMany(Connection, { foreignKey: 'addresseeId', as: 'connectionRequestsReceived' });
@@ -165,4 +171,4 @@ const syncDb = async () => {
   }
 };
 
-module.exports = { sequelize, User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, Post, PostReaction, PostComment, PostView, Connection, Produto, ProdutoReaction, ProdutoComment, PasswordResetToken, syncDb };
+module.exports = { sequelize, User, Vaga, Candidatura, Chamado, RespostaChamado, Mensagem, Conversa, Notificacao, Denuncia, Admin, Apoio, PushSubscription, Post, PostReaction, PostComment, PostView, PostFeedback, Connection, Produto, ProdutoReaction, ProdutoComment, PasswordResetToken, syncDb };

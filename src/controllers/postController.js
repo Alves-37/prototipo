@@ -1,4 +1,4 @@
-const { Post, PostReaction, PostComment, PostView, User, Notificacao } = require('../models');
+const { Post, PostReaction, PostComment, PostView, PostFeedback, User, Notificacao } = require('../models');
 
 const getPublicBaseUrl = (req) => {
   try {
@@ -9,6 +9,31 @@ const getPublicBaseUrl = (req) => {
     return `${proto}://${host}`;
   } catch {
     return `${req.protocol}://${req.get('host')}`;
+  }
+};
+
+exports.setInterest = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { id } = req.params;
+    const interested = !!(req.body && req.body.interested);
+
+    const post = await Post.findByPk(id);
+    if (!post) return res.status(404).json({ error: 'Post não encontrado' });
+
+    const [row] = await PostFeedback.findOrCreate({
+      where: { postId: Number(id), userId: Number(userId) },
+      defaults: { postId: Number(id), userId: Number(userId), interested },
+    });
+
+    if (row) {
+      await row.update({ interested });
+    }
+
+    return res.json({ ok: true, postId: Number(id), interested });
+  } catch (err) {
+    console.error('Erro ao registrar interesse no post:', err);
+    return res.status(500).json({ error: 'Erro ao registrar interesse no post' });
   }
 };
 

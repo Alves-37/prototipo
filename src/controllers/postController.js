@@ -499,30 +499,47 @@ exports.toggleLike = async (req, res) => {
   try {
     const userId = req.user.id;
     const { id } = req.params;
+    const { type } = req.body || {};
 
     const post = await Post.findByPk(id);
     if (!post) return res.status(404).json({ error: 'Post não encontrado' });
 
     const existing = await PostReaction.findOne({ where: { postId: id, userId } });
 
+    let liked = false;
+    let finalType = type || 'like';
+
     if (existing) {
-      await existing.destroy();
-    } else {
-      await PostReaction.create({ postId: id, userId, type: 'like' });
+      if (!type || existing.type === type) {
+        // Se não passou tipo ou é o mesmo tipo, remove (unlike)
+        await existing.destroy();
+        liked = false;
+        finalType = null;
+      } else {
+        // Se passou um tipo diferente, atualiza a reação
+        await existing.update({ type });
+        liked = true;
+        finalType = type;
+      }
+    } else if (type !== null) {
+      // Se não existia e o tipo não é explicitamente nulo, cria nova
+      await PostReaction.create({ postId: id, userId, type: finalType });
+      liked = true;
     }
 
     const likes = await PostReaction.count({ where: { postId: id } });
 
-    // Notificação para o dono do post (somente quando adiciona like)
+    // Notificação para o dono do post (somente quando adiciona ou muda reação)
     try {
       const postOwnerId = post.userId;
-      if (!existing && postOwnerId && Number(postOwnerId) !== Number(userId)) {
+      if (liked && postOwnerId && Number(postOwnerId) !== Number(userId)) {
         const actorName = req.user?.nome || 'Alguém';
+        const reactionLabel = finalType === 'like' ? 'curtiu' : 'reagiu ao';
         const notif = await Notificacao.create({
           usuarioId: postOwnerId,
           tipo: 'sistema',
-          titulo: 'Curtida',
-          mensagem: `${actorName} curtiu seu post.`,
+          titulo: 'Reação',
+          mensagem: `${actorName} ${reactionLabel} seu post.`,
           referenciaTipo: 'outro',
           referenciaId: Number(id),
           lida: false,
@@ -541,7 +558,7 @@ exports.toggleLike = async (req, res) => {
         }
       }
     } catch (e) {
-      console.error('Falha ao criar/emitir notificação de curtida:', e);
+      console.error('Falha ao criar/emitir notificação de reação:', e);
     }
 
     try {
@@ -550,7 +567,8 @@ exports.toggleLike = async (req, res) => {
         io.emit('post:like', {
           postId: Number(id),
           userId: Number(userId),
-          liked: !existing,
+          liked,
+          type: finalType,
           likes,
         });
       }
@@ -560,11 +578,12 @@ exports.toggleLike = async (req, res) => {
 
     return res.json({
       postId: Number(id),
-      liked: !existing,
+      liked,
+      type: finalType,
       likes,
     });
   } catch (err) {
-    console.error('Erro ao curtir/descurtir post:', err);
+    console.error('Erro ao reagir ao post:', err);
     return res.status(500).json({ error: 'Erro ao reagir ao post' });
   }
 };

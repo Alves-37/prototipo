@@ -1,4 +1,4 @@
-const { Post, PostReaction, PostComment, PostView, PostFeedback, User, Notificacao } = require('../models');
+const { Post, PostReaction, PostComment, PostView, PostFeedback, PostCommentReaction, User, Notificacao } = require('../models');
 
 const getPublicBaseUrl = (req) => {
   try {
@@ -34,6 +34,39 @@ exports.setInterest = async (req, res) => {
   } catch (err) {
     console.error('Erro ao registrar interesse no post:', err);
     return res.status(500).json({ error: 'Erro ao registrar interesse no post' });
+  }
+};
+
+exports.toggleCommentLike = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { id, commentId } = req.params;
+
+    const comment = await PostComment.findByPk(commentId);
+    if (!comment || String(comment.postId) !== String(id)) {
+      return res.status(404).json({ error: 'Comentário não encontrado' });
+    }
+
+    const existing = await PostCommentReaction.findOne({
+      where: { commentId, userId }
+    });
+
+    if (existing) {
+      await existing.destroy();
+    } else {
+      await PostCommentReaction.create({ commentId, userId, type: 'like' });
+    }
+
+    const likes = await PostCommentReaction.count({ where: { commentId } });
+
+    return res.json({
+      commentId: Number(commentId),
+      liked: !existing,
+      likes
+    });
+  } catch (err) {
+    console.error('Erro ao curtir comentário:', err);
+    return res.status(500).json({ error: 'Erro ao reagir ao comentário' });
   }
 };
 

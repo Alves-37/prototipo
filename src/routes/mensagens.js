@@ -34,6 +34,9 @@ router.put('/conversa/:conversaId/silenciar', mensagemController.silenciarConver
 // Bloquear/desbloquear usuário
 router.put('/conversa/:conversaId/bloquear', mensagemController.bloquearUsuario);
 
+// Obter ou criar conversa sem enviar mensagem
+router.post('/get-or-create', mensagemController.getOrCreateConversa);
+
 // Apagar conversa
 router.delete('/conversa/:conversaId', mensagemController.apagarConversa);
 

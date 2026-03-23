@@ -693,6 +693,36 @@ exports.silenciarConversa = async (req, res) => {
   }
 };
 
+// Obter ou criar conversa e retornar ID
+exports.getOrCreateConversa = async (req, res) => {
+  try {
+    const remetenteId = req.user.id;
+    const { destinatarioId, vagaId } = req.body;
+
+    if (!destinatarioId) {
+      return res.status(400).json({ error: 'Destinatário não informado' });
+    }
+
+    const destinatario = await User.findByPk(destinatarioId);
+    if (!destinatario) {
+      return res.status(404).json({ error: 'Destinatário não encontrado' });
+    }
+
+    const conversa = await obterOuCriarConversa(remetenteId, Number(destinatarioId), vagaId || null);
+
+    return res.json({
+      conversaId: conversa.conversaId,
+      usuario1Id: conversa.usuario1Id,
+      usuario2Id: conversa.usuario2Id,
+      bloqueada1: conversa.bloqueada1,
+      bloqueada2: conversa.bloqueada2
+    });
+  } catch (error) {
+    console.error('Erro ao obter ou criar conversa:', error);
+    return res.status(500).json({ error: 'Erro ao obter conversa' });
+  }
+};
+
 // Bloquear/desbloquear usuário
 exports.bloquearUsuario = async (req, res) => {
   try {

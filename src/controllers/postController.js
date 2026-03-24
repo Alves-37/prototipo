@@ -14,7 +14,7 @@ const getPublicBaseUrl = (req) => {
 };
 
 // Função para enviar push notification
-const sendPushNotification = async (userId, title, body, url = null) => {
+const sendPushNotification = async (userId, title, body, url = null, tag = null) => {
   try {
     const cfg = ensureVapidConfigured();
     if (!cfg.ok) return;
@@ -22,11 +22,13 @@ const sendPushNotification = async (userId, title, body, url = null) => {
     const subs = await PushSubscription.findAll({ where: { userId } });
     if (!subs.length) return;
 
+    const now = Date.now();
     const payload = JSON.stringify({
       title: String(title),
       body: String(body),
       url: url || '/',
-      tag: 'nevu-notification',
+      tag: tag ? String(tag) : `nevu-notification-${now}`,
+      ts: now,
     });
 
     for (const row of subs) {

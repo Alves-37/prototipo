@@ -91,6 +91,15 @@ const User = sequelize.define('User', {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
   },
+  pushEnabled: {
+    type: DataTypes.BOOLEAN,
+    allowNull: true,
+    defaultValue: null,
+  },
+  pushPromptAnsweredAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
   vagasInteresse: DataTypes.TEXT, // JSON string
   
   // Campos complexos (JSON)

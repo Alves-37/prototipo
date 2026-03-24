@@ -37,7 +37,9 @@ const filtrarCamposUsuario = (user) => {
         inscricaoFiscal: userData.inscricaoFiscal,
         anoFundacao: userData.anoFundacao,
         capitalSocial: userData.capitalSocial,
-        moedaCapital: userData.moedaCapital
+        moedaCapital: userData.moedaCapital,
+        pushEnabled: Object.prototype.hasOwnProperty.call(userData, 'pushEnabled') ? userData.pushEnabled : undefined,
+        pushPromptAnsweredAt: Object.prototype.hasOwnProperty.call(userData, 'pushPromptAnsweredAt') ? userData.pushPromptAnsweredAt : undefined
       }
     };
   } else {
@@ -76,7 +78,9 @@ const filtrarCamposUsuario = (user) => {
         mostrarEndereco: userData.mostrarEndereco,
         alertasVagas: userData.alertasVagas,
         frequenciaAlertas: userData.frequenciaAlertas,
-        vagasInteresse: userData.vagasInteresse
+        vagasInteresse: userData.vagasInteresse,
+        pushEnabled: Object.prototype.hasOwnProperty.call(userData, 'pushEnabled') ? userData.pushEnabled : undefined,
+        pushPromptAnsweredAt: Object.prototype.hasOwnProperty.call(userData, 'pushPromptAnsweredAt') ? userData.pushPromptAnsweredAt : undefined
       }
     };
   }

@@ -62,7 +62,9 @@ const filtrarCamposUsuario = (user) => {
         anoFundacao: userData.anoFundacao,
         capitalSocial: userData.capitalSocial,
         moedaCapital: userData.moedaCapital,
-        somNotificacoes: Object.prototype.hasOwnProperty.call(userData, 'somNotificacoes') ? userData.somNotificacoes : undefined
+        somNotificacoes: Object.prototype.hasOwnProperty.call(userData, 'somNotificacoes') ? userData.somNotificacoes : undefined,
+        pushEnabled: Object.prototype.hasOwnProperty.call(userData, 'pushEnabled') ? userData.pushEnabled : undefined,
+        pushPromptAnsweredAt: Object.prototype.hasOwnProperty.call(userData, 'pushPromptAnsweredAt') ? userData.pushPromptAnsweredAt : undefined
       }
     };
   } else {
@@ -106,6 +108,8 @@ const filtrarCamposUsuario = (user) => {
         alertasVagas: userData.alertasVagas,
         frequenciaAlertas: userData.frequenciaAlertas,
         somNotificacoes: Object.prototype.hasOwnProperty.call(userData, 'somNotificacoes') ? userData.somNotificacoes : undefined,
+        pushEnabled: Object.prototype.hasOwnProperty.call(userData, 'pushEnabled') ? userData.pushEnabled : undefined,
+        pushPromptAnsweredAt: Object.prototype.hasOwnProperty.call(userData, 'pushPromptAnsweredAt') ? userData.pushPromptAnsweredAt : undefined,
         vagasInteresse: userData.vagasInteresse ? JSON.parse(userData.vagasInteresse) : [],
         idiomas: userData.idiomas ? JSON.parse(userData.idiomas) : [],
         certificacoes: userData.certificacoes ? JSON.parse(userData.certificacoes) : [],
@@ -226,6 +230,18 @@ exports.atualizar = async (req, res) => {
           }
         } catch {}
       }
+
+      if (perfil.pushEnabled !== undefined) {
+        dadosAtualizacao.pushEnabled = perfil.pushEnabled === null ? null : !!perfil.pushEnabled;
+      }
+      if (perfil.pushPromptAnsweredAt !== undefined) {
+        if (perfil.pushPromptAnsweredAt === null || perfil.pushPromptAnsweredAt === '') {
+          dadosAtualizacao.pushPromptAnsweredAt = null;
+        } else {
+          const d = new Date(perfil.pushPromptAnsweredAt);
+          dadosAtualizacao.pushPromptAnsweredAt = isNaN(d.getTime()) ? new Date() : d;
+        }
+      }
       
       // Campos JSON
       if (perfil.habilidades !== undefined) {
@@ -291,6 +307,18 @@ exports.atualizar = async (req, res) => {
             dadosAtualizacao.somNotificacoes = !!perfil.somNotificacoes;
           }
         } catch {}
+      }
+
+      if (perfil && perfil.pushEnabled !== undefined) {
+        dadosAtualizacao.pushEnabled = perfil.pushEnabled === null ? null : !!perfil.pushEnabled;
+      }
+      if (perfil && perfil.pushPromptAnsweredAt !== undefined) {
+        if (perfil.pushPromptAnsweredAt === null || perfil.pushPromptAnsweredAt === '') {
+          dadosAtualizacao.pushPromptAnsweredAt = null;
+        } else {
+          const d = new Date(perfil.pushPromptAnsweredAt);
+          dadosAtualizacao.pushPromptAnsweredAt = isNaN(d.getTime()) ? new Date() : d;
+        }
       }
     }
     

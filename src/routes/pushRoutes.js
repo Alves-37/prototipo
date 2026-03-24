@@ -11,4 +11,7 @@ router.post('/unsubscribe', pushController.unsubscribe);
 router.post('/me/subscribe', authMiddleware, pushController.subscribe);
 router.post('/me/unsubscribe', authMiddleware, pushController.unsubscribe);
 
+// Teste (autenticado): envia uma notificação push para o próprio usuário
+router.post('/test', authMiddleware, pushController.test);
+
 module.exports = router;

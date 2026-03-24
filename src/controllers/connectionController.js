@@ -1,4 +1,66 @@
-const { Connection, User, Notificacao } = require('../models');
+const { Connection, User, Notificacao, PushSubscription } = require('../models');
+const webpush = require('web-push');
+
+// Helper functions para VAPID (alinhado com outros controllers)
+const ensureVapidConfigured = () => {
+  const publicKey = process.env.VAPID_PUBLIC_KEY;
+  const privateKey = process.env.VAPID_PRIVATE_KEY;
+  const subject = process.env.VAPID_SUBJECT;
+
+  if (!publicKey || !privateKey || !subject) {
+    return { ok: false, missing: { publicKey: !publicKey, privateKey: !privateKey, subject: !subject } };
+  }
+
+  webpush.setVapidDetails(subject, publicKey, privateKey);
+  return { ok: true, publicKey, privateKey, subject };
+};
+
+const subscriptionRowToWebpush = (row) => {
+  try {
+    const endpoint = String(row.endpoint || '');
+    const p256dh = String(row.p256dh || '');
+    const auth = String(row.auth || '');
+
+    if (!endpoint || !p256dh || !auth) return null;
+    return { endpoint, keys: { p256dh, auth } };
+  } catch {
+    return null;
+  }
+};
+
+const sendPushNotification = async (userId, title, body, url = null, tag = null) => {
+  try {
+    const cfg = ensureVapidConfigured();
+    if (!cfg.ok) return;
+
+    const subs = await PushSubscription.findAll({ where: { userId } });
+    if (!subs.length) return;
+
+    const now = Date.now();
+    const payload = JSON.stringify({
+      title: String(title),
+      body: String(body),
+      url: url || '/',
+      tag: tag ? String(tag) : `nevu-notification-${now}`,
+      ts: now,
+    });
+
+    for (const row of subs) {
+      try {
+        const sub = subscriptionRowToWebpush(row);
+        if (!sub) continue;
+        await webpush.sendNotification(sub, payload);
+      } catch (err) {
+        const statusCode = err?.statusCode;
+        if (statusCode === 410 || statusCode === 404) {
+          try { await row.destroy(); } catch {}
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao enviar push:', err);
+  }
+};
 
 const publicUser = (u) => {
   if (!u) return null;
@@ -97,6 +159,14 @@ exports.request = async (req, res) => {
         lida: false,
       });
 
+      await sendPushNotification(
+        other,
+        title,
+        `${meName} quer se conectar com você.`,
+        '/conexoes',
+        `nevu-connection-request-${conn.id}`
+      );
+
       const io = req.app && req.app.get ? req.app.get('io') : null;
       if (io) {
         io.to(`user:${other}`).emit('notification:new', {
@@ -182,6 +252,14 @@ exports.accept = async (req, res) => {
         referenciaId: conn.id,
         lida: false,
       });
+
+      await sendPushNotification(
+        requesterId,
+        'Conexão aceita',
+        `${meName} aceitou seu pedido de conexão.`,
+        '/conexoes',
+        `nevu-connection-accepted-${conn.id}`
+      );
 
       const io = req.app && req.app.get ? req.app.get('io') : null;
       if (io) {

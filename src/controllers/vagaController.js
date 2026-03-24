@@ -1,4 +1,5 @@
-const { Vaga, User, Candidatura, Notificacao } = require('../models');
+const { Vaga, User, Candidatura, Notificacao, PushSubscription } = require('../models');
+const webpush = require('web-push');
 const { Op } = require('sequelize');
 const path = require('path');
 const fs = require('fs');
@@ -6,26 +7,76 @@ const fs = require('fs');
 const uploadSingleToCloudinaryOrLocal = async (fileObj, folder) => {
   if (!fileObj) return undefined;
 
-  const cloudinary = require('../config/cloudinary');
-  if (!cloudinary) {
-    return `/uploads/${fileObj.filename}`;
+  try {
+    const result = await cloudinary.uploader.upload(fileObj.path, {
+      folder: `nevu/${folder}`
+    });
+    return result.secure_url;
+  } catch (error) {
+    console.error('Erro ao fazer upload para Cloudinary:', error);
+    return null;
+  }
+};
+
+// Helpers para push notification (VAPID)
+const ensureVapidConfigured = () => {
+  const publicKey = process.env.VAPID_PUBLIC_KEY;
+  const privateKey = process.env.VAPID_PRIVATE_KEY;
+  const subject = process.env.VAPID_SUBJECT;
+
+  if (!publicKey || !privateKey || !subject) {
+    return { ok: false, missing: { publicKey: !publicKey, privateKey: !privateKey, subject: !subject } };
   }
 
+  webpush.setVapidDetails(subject, publicKey, privateKey);
+  return { ok: true, publicKey, privateKey, subject };
+};
+
+const subscriptionRowToWebpush = (row) => {
   try {
-    const fullPath = fileObj.path || path.join(__dirname, '../../uploads', fileObj.filename);
-    const result = await cloudinary.uploader.upload(fullPath, {
-      folder: `nevu/${folder}`,
-      resource_type: 'image',
+    const endpoint = String(row.endpoint || '');
+    const p256dh = String(row.p256dh || '');
+    const auth = String(row.auth || '');
+
+    if (!endpoint || !p256dh || !auth) return null;
+    return { endpoint, keys: { p256dh, auth } };
+  } catch {
+    return null;
+  }
+};
+
+const sendPushNotification = async (userId, title, body, url = null, tag = null) => {
+  try {
+    const cfg = ensureVapidConfigured();
+    if (!cfg.ok) return;
+
+    const subs = await PushSubscription.findAll({ where: { userId } });
+    if (!subs.length) return;
+
+    const now = Date.now();
+    const payload = JSON.stringify({
+      title: String(title),
+      body: String(body),
+      url: url || '/',
+      tag: tag ? String(tag) : `nevu-notification-${now}`,
+      ts: now,
     });
 
-    try { fs.unlinkSync(fullPath); } catch {}
-
-    if (result?.secure_url) return String(result.secure_url);
-  } catch (e) {
-    console.error('Falha ao enviar imagem da vaga ao Cloudinary:', e);
+    for (const row of subs) {
+      try {
+        const sub = subscriptionRowToWebpush(row);
+        if (!sub) continue;
+        await webpush.sendNotification(sub, payload);
+      } catch (err) {
+        const statusCode = err?.statusCode;
+        if (statusCode === 410 || statusCode === 404) {
+          try { await row.destroy(); } catch {}
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao enviar push:', err);
   }
-
-  return `/uploads/${fileObj.filename}`;
 };
 
 // Listar todas as vagas públicas (para candidatos)
@@ -270,6 +321,21 @@ exports.criar = async (req, res) => {
       }));
       if (notifs.length > 0) {
         await Notificacao.bulkCreate(notifs, { validate: true });
+      }
+
+      // Enviar push notification para cada usuário (best-effort)
+      const pushTitle = 'Nova vaga publicada';
+      const pushBody = `A empresa ${empresaNome} publicou a vaga: ${vagaTitulo}`;
+      for (const u of usuarios) {
+        const uid = Number(u?.id);
+        if (!uid) continue;
+        await sendPushNotification(
+          uid,
+          pushTitle,
+          pushBody,
+          vagaCompleta?.id ? `/vaga/${vagaCompleta.id}` : '/vagas',
+          vagaCompleta?.id ? `nevu-vaga-${vagaCompleta.id}-user-${uid}` : null
+        );
       }
     } catch (e) {
       console.warn('Aviso: falha ao criar notificações de nova vaga:', e.message);

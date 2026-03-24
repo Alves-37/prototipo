@@ -106,7 +106,13 @@ exports.test = async (req, res) => {
       tag: 'nevu-test',
     });
 
+    console.log('=== DEBUG: Push Test ===');
+    console.log('req.user:', req.user);
+    console.log('req.user.id:', req.user?.id);
+
     const subs = await PushSubscription.findAll({ where: { userId: req.user.id } });
+    console.log('Subscriptions encontradas:', subs.length);
+    
     if (!subs.length) {
       return res.status(404).json({ error: 'Nenhuma inscrição push encontrada para este usuário' });
     }

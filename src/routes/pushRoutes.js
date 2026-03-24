@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const pushController = require('../controllers/pushController');
-const { authMiddleware } = require('../middlewares/auth');
+const { authMiddleware, optionalAuthMiddleware } = require('../middlewares/auth');
 
 // Endpoints públicos (não exigem auth): permitem registrar browsers antes do login
-router.post('/subscribe', pushController.subscribe);
-router.post('/unsubscribe', pushController.unsubscribe);
+router.post('/subscribe', optionalAuthMiddleware, pushController.subscribe);
+router.post('/unsubscribe', optionalAuthMiddleware, pushController.unsubscribe);
 
 // Endpoints autenticados (opcional): registrar associação userId-inscrição
 router.post('/me/subscribe', authMiddleware, pushController.subscribe);

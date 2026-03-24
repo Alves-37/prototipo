@@ -38,12 +38,15 @@ exports.subscribe = async (req, res) => {
       return res.status(400).json({ error: 'endpoint é obrigatório' });
     }
     // Opcional: validar estrutura de keys (p256dh, auth)
-    const assocUserId = userId || (req.user ? req.user.id : null) || null;
+    const assocUserId = userId || (req.user ? (req.user.id || req.user._id) : null) || null;
     
     console.log('=== DEBUG: Push Subscribe ===');
-    console.log('req.user:', req.user);
-    console.log('assocUserId:', assocUserId);
-    console.log('body.userId:', userId);
+    console.log('Token decodificado (req.user):', req.user ? 'SIM' : 'NÃO');
+    if (req.user) {
+      console.log('ID do usuário no req.user:', req.user.id || req.user._id);
+    }
+    console.log('AssocUserId final:', assocUserId);
+    console.log('Endpoint:', endpoint);
 
     // Upsert por endpoint para evitar duplicados
     const payload = {

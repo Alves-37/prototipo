@@ -63,9 +63,8 @@ const ensureVapidConfigured = () => {
 const subscriptionRowToWebpush = (row) => {
   try {
     const endpoint = String(row.endpoint || '');
-    const keys = row.keys || {};
-    const p256dh = String(keys.p256dh || '');
-    const auth = String(keys.auth || '');
+    const p256dh = String(row.p256dh || '');
+    const auth = String(row.auth || '');
 
     if (!endpoint || !p256dh || !auth) return null;
 

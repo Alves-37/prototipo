@@ -37,13 +37,14 @@ exports.subscribe = async (req, res) => {
     if (!endpoint) {
       return res.status(400).json({ error: 'endpoint é obrigatório' });
     }
-    // Opcional: validar estrutura de keys (p256dh, auth)
+    // Enviar inscrição para o backend
     const assocUserId = userId || (req.user ? (req.user.id || req.user._id) : null) || null;
     
     console.log('=== DEBUG: Push Subscribe ===');
     console.log('Token decodificado (req.user):', req.user ? 'SIM' : 'NÃO');
     if (req.user) {
       console.log('ID do usuário no req.user:', req.user.id || req.user._id);
+      console.log('Tipo do usuário no req.user:', req.user.tipo);
     }
     console.log('AssocUserId final:', assocUserId);
     console.log('Endpoint:', endpoint);

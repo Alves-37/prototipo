@@ -394,40 +394,43 @@ exports.atualizarFase = async (req, res) => {
     try {
       const sanitize = (s) => (typeof s === 'string' ? s.replace(/<[^>]*>/g, '').trim() : s);
       const tituloVaga = sanitize(candidatura.vaga?.titulo || 'Vaga');
-      const nomeEmpresa = sanitize((await User.findByPk(candidatura.vaga.empresaId))?.nome || 'a empresa');
+      
+      // Tentar obter o nome da empresa de várias formas
+      const empresa = await User.findByPk(candidatura.vaga.empresaId);
+      const nomeEmpresa = sanitize(empresa?.nome || empresa?.razaoSocial || 'a empresa');
 
-      let mensagem;
+      let msgCorpo;
       switch (fase) {
         case 'em_analise':
-          mensagem = `A sua candidatura para "${tituloVaga}" está em análise pela ${nomeEmpresa}.`;
+          msgCorpo = `A sua candidatura para "${tituloVaga}" está em análise pela ${nomeEmpresa}.`;
           break;
         case 'entrevista_agendada':
-          mensagem = `A ${nomeEmpresa} agendou uma entrevista para a vaga "${tituloVaga}". Verifique os detalhes no painel.`;
+          msgCorpo = `A ${nomeEmpresa} agendou uma entrevista para a vaga "${tituloVaga}". Verifique os detalhes no painel.`;
           break;
         case 'entrevista_realizada':
-          mensagem = `A sua entrevista para "${tituloVaga}" foi registrada. Aguarde o retorno da ${nomeEmpresa}.`;
+          msgCorpo = `A sua entrevista para "${tituloVaga}" foi registrada. Aguarde o retorno da ${nomeEmpresa}.`;
           break;
         case 'teste_tecnico':
-          mensagem = `A ${nomeEmpresa} iniciou a fase de teste técnico para a vaga "${tituloVaga}".`;
+          msgCorpo = `A ${nomeEmpresa} iniciou a fase de teste técnico para a vaga "${tituloVaga}".`;
           break;
         case 'aprovada':
-          mensagem = `Parabéns! Você foi aprovado(a) na vaga "${tituloVaga}" pela ${nomeEmpresa}.`;
+          msgCorpo = `Parabéns! Você foi aprovado(a) na vaga "${tituloVaga}" pela ${nomeEmpresa}.`;
           break;
         case 'contratada':
-          mensagem = `Parabéns! Você foi contratado(a) pela ${nomeEmpresa} para a vaga "${tituloVaga}".`;
+          msgCorpo = `Parabéns! Você foi contratado(a) pela ${nomeEmpresa} para a vaga "${tituloVaga}".`;
           break;
         case 'reprovada':
-          mensagem = `A sua candidatura para "${tituloVaga}" foi reprovada. Continue acompanhando novas oportunidades!`;
+          msgCorpo = `A sua candidatura para "${tituloVaga}" foi reprovada. Continue acompanhando novas oportunidades!`;
           break;
         default:
-          mensagem = `Sua candidatura para "${tituloVaga}" mudou para a fase: ${fase}.`;
+          msgCorpo = `Sua candidatura para "${tituloVaga}" mudou para a fase: ${fase}.`;
       }
 
       await Notificacao.create({
         usuarioId: candidatura.usuario.id,
         tipo: 'candidatura_fase',
         titulo: 'Atualização na sua candidatura',
-        mensagem,
+        mensagem: msgCorpo,
         referenciaTipo: 'candidatura',
         referenciaId: candidatura.id,
       });
@@ -436,7 +439,7 @@ exports.atualizarFase = async (req, res) => {
       await sendPushNotification(
         candidatura.usuario.id,
         'Atualização na sua candidatura',
-        mensagem,
+        msgCorpo,
         `/minhas-candidaturas`
       );
     } catch (e) {

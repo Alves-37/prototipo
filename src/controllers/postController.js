@@ -648,10 +648,10 @@ exports.toggleLike = async (req, res) => {
         const reactionLabel = finalType === 'like' ? 'curtiu' : 'reagiu ao';
         const notif = await Notificacao.create({
           usuarioId: postOwnerId,
-          tipo: 'sistema',
-          titulo: 'Reação',
+          tipo: 'post_reaction',
+          titulo: 'Nova reação no seu post',
           mensagem: `${actorName} ${reactionLabel} seu post.`,
-          referenciaTipo: 'outro',
+          referenciaTipo: 'post',
           referenciaId: Number(id),
           lida: false,
         });
@@ -781,10 +781,10 @@ exports.addComment = async (req, res) => {
         const preview = String(t).length > 60 ? `${String(t).slice(0, 60)}...` : String(t);
         const notif = await Notificacao.create({
           usuarioId: postOwnerId,
-          tipo: 'sistema',
-          titulo: 'Comentário',
+          tipo: 'post_comment',
+          titulo: 'Novo comentário no seu post',
           mensagem: `${actorName} comentou no seu post: ${preview}`,
-          referenciaTipo: 'outro',
+          referenciaTipo: 'post',
           referenciaId: Number(id),
           lida: false,
         });

@@ -1,11 +1,11 @@
-const { Produto, User, ProdutoReaction, ProdutoComment, Notificacao, PushSubscription } = require('../models');
+const { Produto, ProdutoReaction, ProdutoComment, ProdutoCommentReaction, User, Notificacao, PushSubscription } = require('../models');
+const webpush = require('web-push');
 const { Op } = require('sequelize');
 const path = require('path');
 const fs = require('fs');
-const webpush = require('web-push');
 
 // Função para enviar push notification
-const sendPushNotification = async (userId, title, body, url = null) => {
+const sendPushNotification = async (userId, title, body, url = null, tag = null) => {
   try {
     const cfg = ensureVapidConfigured();
     if (!cfg.ok) return;
@@ -13,11 +13,13 @@ const sendPushNotification = async (userId, title, body, url = null) => {
     const subs = await PushSubscription.findAll({ where: { userId } });
     if (!subs.length) return;
 
+    const now = Date.now();
     const payload = JSON.stringify({
       title: String(title),
       body: String(body),
       url: url || '/',
-      tag: 'nevu-notification',
+      tag: tag ? String(tag) : `nevu-notification-${now}`,
+      ts: now,
     });
 
     for (const row of subs) {
@@ -34,6 +36,52 @@ const sendPushNotification = async (userId, title, body, url = null) => {
     }
   } catch (err) {
     console.error('Erro ao enviar push:', err);
+  }
+};
+
+const notifyUsersNewProduct = async (req, produto, empresaId) => {
+  try {
+    const produtoId = Number(produto?.id);
+    if (!produtoId || !empresaId) return;
+
+    const sanitize = (s) => (typeof s === 'string' ? s.replace(/<[^>]*>/g, '').trim() : s);
+    const empresaNome = sanitize(req.user?.nome || 'Uma empresa');
+    const produtoTitulo = sanitize(produto?.titulo || 'Produto');
+
+    const destinatarios = await User.findAll({
+      where: { id: { [Op.ne]: empresaId } },
+      attributes: ['id'],
+    });
+
+    const notifs = destinatarios.map(u => ({
+      usuarioId: u.id,
+      tipo: 'sistema',
+      titulo: 'Novo produto publicado',
+      mensagem: `${empresaNome} publicou um novo produto: ${produtoTitulo}`,
+      referenciaTipo: 'produto',
+      referenciaId: produtoId,
+      lida: false,
+    }));
+
+    if (notifs.length > 0) {
+      await Notificacao.bulkCreate(notifs, { validate: true });
+    }
+
+    const pushTitle = 'Novo produto publicado';
+    const pushBody = `${empresaNome} publicou um novo produto: ${produtoTitulo}`;
+    for (const u of destinatarios) {
+      const uid = Number(u?.id);
+      if (!uid) continue;
+      await sendPushNotification(
+        uid,
+        pushTitle,
+        pushBody,
+        `/produto/${produtoId}`,
+        `nevu-produto-${produtoId}-user-${uid}`
+      );
+    }
+  } catch (e) {
+    console.warn('Aviso: falha ao criar/enviar notificações de novo produto:', e?.message || e);
   }
 };
 
@@ -712,6 +760,8 @@ exports.create = async (req, res) => {
     });
 
     const raw = typeof produto.toJSON === 'function' ? produto.toJSON() : produto;
+
+    await notifyUsersNewProduct(req, raw, Number(empresaId));
 
     try {
       const io = req.app && req.app.get ? req.app.get('io') : null;

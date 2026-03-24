@@ -1,6 +1,68 @@
-const { Chamado, RespostaChamado, User, Notificacao } = require('../models');
+const { Chamado, RespostaChamado, User, Notificacao, PushSubscription } = require('../models');
+const webpush = require('web-push');
 
 const { Op } = require('sequelize');
+
+// Helpers para push notification (VAPID)
+const ensureVapidConfigured = () => {
+  const publicKey = process.env.VAPID_PUBLIC_KEY;
+  const privateKey = process.env.VAPID_PRIVATE_KEY;
+  const subject = process.env.VAPID_SUBJECT;
+
+  if (!publicKey || !privateKey || !subject) {
+    return { ok: false, missing: { publicKey: !publicKey, privateKey: !privateKey, subject: !subject } };
+  }
+
+  webpush.setVapidDetails(subject, publicKey, privateKey);
+  return { ok: true, publicKey, privateKey, subject };
+};
+
+const subscriptionRowToWebpush = (row) => {
+  try {
+    const endpoint = String(row.endpoint || '');
+    const p256dh = String(row.p256dh || '');
+    const auth = String(row.auth || '');
+
+    if (!endpoint || !p256dh || !auth) return null;
+    return { endpoint, keys: { p256dh, auth } };
+  } catch {
+    return null;
+  }
+};
+
+const sendPushNotification = async (userId, title, body, url = null, tag = null) => {
+  try {
+    const cfg = ensureVapidConfigured();
+    if (!cfg.ok) return;
+
+    const subs = await PushSubscription.findAll({ where: { userId } });
+    if (!subs.length) return;
+
+    const now = Date.now();
+    const payload = JSON.stringify({
+      title: String(title),
+      body: String(body),
+      url: url || '/',
+      tag: tag ? String(tag) : `nevu-notification-${now}`,
+      ts: now,
+    });
+
+    for (const row of subs) {
+      try {
+        const sub = subscriptionRowToWebpush(row);
+        if (!sub) continue;
+        await webpush.sendNotification(sub, payload);
+      } catch (err) {
+        const statusCode = err?.statusCode;
+        if (statusCode === 410 || statusCode === 404) {
+          try { await row.destroy(); } catch {}
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao enviar push:', err);
+  }
+};
 
 // Listar todos os chamados com filtros
 exports.listar = async (req, res) => {
@@ -269,6 +331,20 @@ exports.criar = async (req, res) => {
       if (notifs.length > 0) {
         await Notificacao.bulkCreate(notifs, { validate: true });
       }
+
+      const pushTitle = 'Novo chamado publicado';
+      const pushBody = `${autorNome} publicou o chamado: ${chamadoTitulo}`;
+      for (const u of destinatarios) {
+        const uid = Number(u?.id);
+        if (!uid) continue;
+        await sendPushNotification(
+          uid,
+          pushTitle,
+          pushBody,
+          chamadoCompleto?.id ? `/chamado/${chamadoCompleto.id}` : '/chamados',
+          chamadoCompleto?.id ? `nevu-chamado-${chamadoCompleto.id}-user-${uid}` : null
+        );
+      }
     } catch (e) {
       console.warn('Aviso: falha ao criar notificações de novo chamado:', e.message);
     }
@@ -425,14 +501,25 @@ exports.adicionarResposta = async (req, res) => {
     // Notificar o autor do chamado sobre a nova resposta
     try {
       if (chamado && chamado.usuarioId) {
+        const tituloNotif = 'Nova resposta ao seu chamado';
+        const mensagemNotif = `${respostaCompleta?.usuario?.nome || 'Um usuário'} respondeu ao chamado: ${chamado.titulo}`;
+
         await Notificacao.create({
           usuarioId: chamado.usuarioId,
           tipo: 'sistema',
-          titulo: 'Nova resposta ao seu chamado',
-          mensagem: `${respostaCompleta?.usuario?.nome || 'Um usuário'} respondeu ao chamado: ${chamado.titulo}`,
+          titulo: tituloNotif,
+          mensagem: mensagemNotif,
           referenciaTipo: 'chamado',
           referenciaId: chamado.id,
         });
+
+        await sendPushNotification(
+          chamado.usuarioId,
+          tituloNotif,
+          mensagemNotif,
+          chamado?.id ? `/chamado/${chamado.id}` : '/chamados',
+          chamado?.id ? `nevu-chamado-resposta-${chamado.id}` : null
+        );
       }
     } catch (e) {
       console.warn('Aviso: falha ao criar notificação de nova resposta de chamado:', e.message);
@@ -471,14 +558,25 @@ exports.aceitarResposta = async (req, res) => {
     
     // Notificar o autor da resposta que ela foi aceita
     try {
+      const tituloNotif = 'Sua resposta foi aceita';
+      const mensagemNotif = `Sua resposta ao chamado "${chamado.titulo}" foi aceita. O chamado agora está em andamento.`;
+
       await Notificacao.create({
         usuarioId: resposta.usuarioId,
         tipo: 'sistema',
-        titulo: 'Sua resposta foi aceita',
-        mensagem: `Sua resposta ao chamado "${chamado.titulo}" foi aceita. O chamado agora está em andamento.`,
+        titulo: tituloNotif,
+        mensagem: mensagemNotif,
         referenciaTipo: 'chamado',
         referenciaId: chamado.id,
       });
+
+      await sendPushNotification(
+        resposta.usuarioId,
+        tituloNotif,
+        mensagemNotif,
+        chamado?.id ? `/chamado/${chamado.id}` : '/chamados',
+        chamado?.id ? `nevu-chamado-resposta-aceita-${chamado.id}` : null
+      );
     } catch (e) {
       console.warn('Aviso: falha ao criar notificação de resposta aceita:', e.message);
     }

@@ -39,6 +39,11 @@ exports.subscribe = async (req, res) => {
     }
     // Opcional: validar estrutura de keys (p256dh, auth)
     const assocUserId = userId || (req.user ? req.user.id : null) || null;
+    
+    console.log('=== DEBUG: Push Subscribe ===');
+    console.log('req.user:', req.user);
+    console.log('assocUserId:', assocUserId);
+    console.log('body.userId:', userId);
 
     // Upsert por endpoint para evitar duplicados
     const payload = {

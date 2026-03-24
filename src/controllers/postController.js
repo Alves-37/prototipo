@@ -113,6 +113,21 @@ const toAbsolute = (req, maybePath) => {
   return `${baseUrl}${path}`;
 };
 
+const normalizeImagens = (req, post) => {
+  try {
+    const raw = post && (typeof post.toJSON === 'function' ? post.toJSON() : post);
+    const imagensRaw = raw?.imagens;
+    if (Array.isArray(imagensRaw)) {
+      return imagensRaw.map((x) => toAbsolute(req, x)).filter(Boolean);
+    }
+    if (typeof imagensRaw === 'string' && imagensRaw.trim()) {
+      const parsed = JSON.parse(imagensRaw);
+      return Array.isArray(parsed) ? parsed.map((x) => toAbsolute(req, x)).filter(Boolean) : [];
+    }
+  } catch {}
+  return [];
+};
+
 const publicAuthor = (req, user) => {
   if (!user) return null;
   const raw = typeof user.toJSON === 'function' ? user.toJSON() : user;
@@ -213,12 +228,14 @@ exports.list = async (req, res) => {
     return res.json({
       posts: rows.map(p => {
         const raw = typeof p.toJSON === 'function' ? p.toJSON() : p;
+        const imagens = normalizeImagens(req, raw);
         return {
           id: raw.id,
           userId: raw.userId,
           postType: raw.postType,
           texto: raw.texto,
           imageUrl: toAbsolute(req, raw.imageUrl),
+          imagens,
           servicePrice: raw.servicePrice,
           serviceCategory: raw.serviceCategory,
           serviceLocation: raw.serviceLocation,
@@ -273,8 +290,26 @@ exports.create = async (req, res) => {
     }
     const t = mod.value;
     const imgFromBody = typeof imageUrl === 'string' ? imageUrl.trim() : '';
-    const imgFromFile = req.file && req.file.filename ? `/uploads/${req.file.filename}` : '';
-    const img = imgFromFile || imgFromBody;
+    const files = Array.isArray(req.files) ? req.files : [];
+    const imagensFromFiles = files
+      .slice(0, 5)
+      .map(f => (f && f.filename ? `/uploads/${f.filename}` : null))
+      .filter(Boolean);
+    const imagensFromBody = (() => {
+      try {
+        if (req.body && req.body.imagens) {
+          const val = req.body.imagens;
+          if (Array.isArray(val)) return val.map(String).map(s => s.trim()).filter(Boolean).slice(0, 5);
+          if (typeof val === 'string' && val.trim()) {
+            const parsed = JSON.parse(val);
+            if (Array.isArray(parsed)) return parsed.map(String).map(s => s.trim()).filter(Boolean).slice(0, 5);
+          }
+        }
+      } catch {}
+      return [];
+    })();
+    const imagens = imagensFromFiles.length ? imagensFromFiles : imagensFromBody;
+    const img = imagens[0] || imgFromBody;
 
     const svcPrice = typeof servicePrice === 'string' ? servicePrice.trim() : '';
     const svcCategory = typeof serviceCategory === 'string' ? serviceCategory.trim() : '';
@@ -295,7 +330,7 @@ exports.create = async (req, res) => {
       }
     }
 
-    if (!t && !img) {
+    if (!t && !img && (!Array.isArray(imagens) || !imagens.length)) {
       return res.status(400).json({ error: 'Informe texto ou imagem.' });
     }
 
@@ -304,6 +339,7 @@ exports.create = async (req, res) => {
       postType: type,
       texto: t || null,
       imageUrl: img || null,
+      imagens: Array.isArray(imagens) ? imagens : [],
       servicePrice: svcPrice || null,
       serviceCategory: svcCategory || null,
       serviceLocation: svcLocation || null,
@@ -317,6 +353,7 @@ exports.create = async (req, res) => {
     });
 
     const raw = typeof post.toJSON === 'function' ? post.toJSON() : post;
+    const absImagens = normalizeImagens(req, raw);
 
     try {
       const io = req.app && req.app.get ? req.app.get('io') : null;
@@ -335,6 +372,7 @@ exports.create = async (req, res) => {
             nome: author?.nome || 'Usuário',
             texto: raw.texto,
             imageUrl: toAbsolute(req, raw.imageUrl),
+            imagens: absImagens,
             postType: raw.postType,
             servicePrice: raw.servicePrice,
             serviceCategory: raw.serviceCategory,
@@ -358,6 +396,7 @@ exports.create = async (req, res) => {
       postType: raw.postType,
       texto: raw.texto,
       imageUrl: toAbsolute(req, raw.imageUrl),
+      imagens: absImagens,
       servicePrice: raw.servicePrice,
       serviceCategory: raw.serviceCategory,
       serviceLocation: raw.serviceLocation,
@@ -403,14 +442,21 @@ exports.update = async (req, res) => {
       patch.imageUrl = img ? img : null;
     }
 
-    if (req.file && req.file.filename) {
-      patch.imageUrl = `/uploads/${req.file.filename}`;
+    const files = Array.isArray(req.files) ? req.files : [];
+    if (files.length) {
+      const imagensFromFiles = files
+        .slice(0, 5)
+        .map(f => (f && f.filename ? `/uploads/${f.filename}` : null))
+        .filter(Boolean);
+      patch.imagens = imagensFromFiles;
+      patch.imageUrl = imagensFromFiles[0] || patch.imageUrl || null;
     }
 
     const nextTexto = Object.prototype.hasOwnProperty.call(patch, 'texto') ? patch.texto : post.texto;
     const nextImage = Object.prototype.hasOwnProperty.call(patch, 'imageUrl') ? patch.imageUrl : post.imageUrl;
+    const nextImagens = Object.prototype.hasOwnProperty.call(patch, 'imagens') ? patch.imagens : post.imagens;
 
-    if (!nextTexto && !nextImage) {
+    if (!nextTexto && !nextImage && (!Array.isArray(nextImagens) || !nextImagens.length)) {
       return res.status(400).json({ error: 'Informe texto ou imagem.' });
     }
 
@@ -421,6 +467,7 @@ exports.update = async (req, res) => {
     });
 
     const raw = typeof withAuthor.toJSON === 'function' ? withAuthor.toJSON() : withAuthor;
+    const absImagens = normalizeImagens(req, raw);
 
     const likes = await PostReaction.count({ where: { postId: post.id } });
     const comments = await PostComment.count({ where: { postId: post.id } });
@@ -439,6 +486,7 @@ exports.update = async (req, res) => {
             nome: raw.author?.nome || 'Usuário',
             texto: raw.texto,
             imageUrl: toAbsolute(req, raw.imageUrl),
+            imagens: absImagens,
             avatarUrl: raw.author?.tipo === 'empresa' ? toAbsolute(req, raw.author?.logo) : toAbsolute(req, raw.author?.foto),
             counts: { likes, comments },
           },
@@ -453,6 +501,7 @@ exports.update = async (req, res) => {
       userId: raw.userId,
       texto: raw.texto,
       imageUrl: toAbsolute(req, raw.imageUrl),
+      imagens: absImagens,
       createdAt: raw.createdAt,
       author: publicAuthor(req, raw.author),
       counts: { likes, comments },

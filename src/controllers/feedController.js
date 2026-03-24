@@ -1,13 +1,30 @@
 const { User, Vaga, Post, PostReaction, PostComment, Connection, Chamado, Produto, ProdutoReaction, ProdutoComment } = require('../models');
 const { Op } = require('sequelize');
 
+const getPublicBaseUrl = (req) => `${req.protocol}://${req.get('host')}`;
+
 const toAbsolute = (req, maybePath) => {
   if (!maybePath) return null;
   const f = String(maybePath);
   if (f.startsWith('http://') || f.startsWith('https://') || f.startsWith('data:')) return f;
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const baseUrl = getPublicBaseUrl(req);
   const path = f.startsWith('/') ? f : `/${f}`;
   return `${baseUrl}${path}`;
+};
+
+const normalizeImagens = (req, row) => {
+  try {
+    const raw = row && (typeof row.toJSON === 'function' ? row.toJSON() : row);
+    const imagensRaw = raw?.imagens;
+    if (Array.isArray(imagensRaw)) {
+      return imagensRaw.map((x) => toAbsolute(req, x)).filter(Boolean);
+    }
+    if (typeof imagensRaw === 'string' && imagensRaw.trim()) {
+      const parsed = JSON.parse(imagensRaw);
+      return Array.isArray(parsed) ? parsed.map((x) => toAbsolute(req, x)).filter(Boolean) : [];
+    }
+  } catch {}
+  return [];
 };
 
 const toPublicUser = (req, u) => {
@@ -226,6 +243,7 @@ exports.getFeed = async (req, res) => {
           nome: author?.nome || 'Usuário',
           texto: raw.texto,
           imageUrl: toAbsolute(req, raw.imageUrl),
+          imagens: normalizeImagens(req, raw),
           postType: raw.postType,
           servicePrice: raw.servicePrice,
           serviceCategory: raw.serviceCategory,

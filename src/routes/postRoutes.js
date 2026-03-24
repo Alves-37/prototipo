@@ -11,8 +11,8 @@ router.get('/:id/likes', postController.listLikes);
 router.post('/:id/view', postController.registerView);
 
 // Protegido
-router.post('/', authMiddleware, upload.single('media'), postController.create);
-router.put('/:id', authMiddleware, upload.single('media'), postController.update);
+router.post('/', authMiddleware, upload.array('media', 5), postController.create);
+router.put('/:id', authMiddleware, upload.array('media', 5), postController.update);
 router.delete('/:id', authMiddleware, postController.remove);
 router.post('/:id/like', authMiddleware, postController.toggleLike);
 router.post('/:id/interest', authMiddleware, postController.setInterest);

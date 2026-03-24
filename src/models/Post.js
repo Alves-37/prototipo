@@ -24,6 +24,11 @@ const Post = sequelize.define('Post', {
     type: DataTypes.TEXT,
     allowNull: true,
   },
+  imagens: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: [],
+  },
   servicePrice: {
     type: DataTypes.STRING,
     allowNull: true,

@@ -1,7 +1,70 @@
-const { Produto, User, ProdutoReaction, ProdutoComment, Notificacao } = require('../models');
+const { Produto, User, ProdutoReaction, ProdutoComment, Notificacao, PushSubscription } = require('../models');
 const { Op } = require('sequelize');
 const path = require('path');
 const fs = require('fs');
+const webpush = require('web-push');
+
+// Função para enviar push notification
+const sendPushNotification = async (userId, title, body, url = null) => {
+  try {
+    const cfg = ensureVapidConfigured();
+    if (!cfg.ok) return;
+
+    const subs = await PushSubscription.findAll({ where: { userId } });
+    if (!subs.length) return;
+
+    const payload = JSON.stringify({
+      title: String(title),
+      body: String(body),
+      url: url || '/',
+      tag: 'nevu-notification',
+    });
+
+    for (const row of subs) {
+      try {
+        const sub = subscriptionRowToWebpush(row);
+        if (!sub) continue;
+        await webpush.sendNotification(sub, payload);
+      } catch (err) {
+        const statusCode = err?.statusCode;
+        if (statusCode === 410 || statusCode === 404) {
+          try { await row.destroy(); } catch {}
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao enviar push:', err);
+  }
+};
+
+// Helper functions para VAPID
+const ensureVapidConfigured = () => {
+  const publicKey = process.env.VAPID_PUBLIC_KEY;
+  const privateKey = process.env.VAPID_PRIVATE_KEY;
+  const subject = process.env.VAPID_SUBJECT;
+
+  if (!publicKey || !privateKey || !subject) {
+    return { ok: false, missing: { publicKey: !publicKey, privateKey: !privateKey, subject: !subject } };
+  }
+
+  webpush.setVapidDetails(subject, publicKey, privateKey);
+  return { ok: true, publicKey, privateKey, subject };
+};
+
+const subscriptionRowToWebpush = (row) => {
+  try {
+    const endpoint = String(row.endpoint || '');
+    const keys = row.keys || {};
+    const p256dh = String(keys.p256dh || '');
+    const auth = String(keys.auth || '');
+
+    if (!endpoint || !p256dh || !auth) return null;
+
+    return { endpoint, keys: { p256dh, auth } };
+  } catch {
+    return null;
+  }
+};
 
 const toAbsolute = (req, maybePath) => {
   if (!maybePath) return null;
@@ -123,6 +186,14 @@ const notifyProdutoOwner = async (req, produto, actorUserId, titulo, mensagem) =
       referenciaId: Number(produto?.id) || null,
       lida: false,
     });
+
+    // Enviar push notification
+    await sendPushNotification(
+      ownerId,
+      titulo,
+      mensagem,
+      produto ? `/produto/${produto.id}` : '/produtos'
+    );
 
     await emitNotificationToUser(req, ownerId, notif);
   } catch (e) {

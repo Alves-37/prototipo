@@ -254,7 +254,7 @@ exports.list = async (req, res) => {
 
     const { rows, count } = await Post.findAndCountAll({
       where,
-      order: Post.sequelize.random(),
+      order: [['createdAt', 'DESC']],
       limit: limitNum,
       offset,
       include: [

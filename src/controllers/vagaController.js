@@ -86,7 +86,15 @@ exports.listarTodas = async (req, res) => {
     const offset = (page - 1) * limit;
     
     // Filtros
-    const where = { status: 'publicada' };
+    const where = {
+      status: 'publicada',
+      dataExpiracao: {
+        [Op.or]: [
+          { [Op.gt]: new Date() },
+          { [Op.is]: null }
+        ]
+      }
+    };
     
     if (area) where.area = { [Op.like]: `%${area}%` };
     if (modalidade) where.modalidade = modalidade;
@@ -123,7 +131,7 @@ exports.listarTodas = async (req, res) => {
           attributes: ['id', 'nome', 'logo', 'setor', 'tamanho']
         }
       ],
-      order: Vaga.sequelize.random(),
+      order: [['dataPublicacao', 'DESC']],
       limit: parseInt(limit),
       offset: parseInt(offset)
     });

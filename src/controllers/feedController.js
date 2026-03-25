@@ -427,7 +427,7 @@ exports.listarPessoas = async (req, res) => {
     const query = String(q || '').trim();
 
     const where = {
-      tipo: 'candidato',
+      tipo: 'usuario', // Alterado de 'candidato' para 'usuario' para bater com o banco
       ...(query ? { nome: { [Op.like]: `%${query}%` } } : {}),
     };
 
@@ -451,6 +451,24 @@ exports.listarPessoas = async (req, res) => {
   } catch (error) {
     console.error('Erro ao listar pessoas:', error);
     return res.status(500).json({ error: 'Erro ao listar pessoas' });
+  }
+};
+
+exports.listPublicUsers = async (req, res) => {
+  return exports.listarPessoas(req, res);
+};
+
+exports.getPublicUserById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findByPk(id, {
+      attributes: ['id', 'nome', 'tipo', 'foto', 'bio', 'localizacao', 'createdAt', 'logo', 'setor', 'tamanho', 'descricao']
+    });
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+    return res.json(user);
+  } catch (error) {
+    console.error('Erro ao buscar usuário público:', error);
+    return res.status(500).json({ error: 'Erro ao buscar usuário' });
   }
 };
 

@@ -1,5 +1,5 @@
 const { User, Post, Vaga, Produto, Chamado, PostReaction, PostComment, ProdutoComment, Op } = require('../models');
-const io = require('../socket');
+// const io = require('../socket'); // Removido pois o arquivo não existe e causa erro de boot
 
 // Função auxiliar para normalizar imagens
 const normalizeImagens = (req, imagens) => {

@@ -255,7 +255,10 @@ exports.listar = async (req, res) => {
       if (!shouldIncludeVagas) return;
 
       const vagaWhere = {
-        ativa: true,
+        status: 'publicada',
+        dataExpiracao: {
+          [Op.or]: [{ [Op.gt]: new Date() }, { [Op.is]: null }],
+        },
         ...(query
           ? {
               [Op.or]: [

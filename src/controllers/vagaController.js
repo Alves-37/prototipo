@@ -87,8 +87,6 @@ exports.listarTodas = async (req, res) => {
     
     // Filtros
     const where = { status: 'publicada' };
-      }
-    };
     
     if (area) where.area = { [Op.like]: `%${area}%` };
     if (modalidade) where.modalidade = modalidade;

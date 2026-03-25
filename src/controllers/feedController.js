@@ -131,7 +131,7 @@ exports.listar = async (req, res) => {
       if (!shouldIncludeVagas) return;
 
       const vagaWhere = {
-        ativa: true,
+        status: 'publicada',
         ...(query
           ? {
               [Op.or]: [

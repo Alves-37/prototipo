@@ -86,13 +86,7 @@ exports.listarTodas = async (req, res) => {
     const offset = (page - 1) * limit;
     
     // Filtros
-    const where = {
-      status: 'publicada',
-      dataExpiracao: {
-        [Op.or]: [
-          { [Op.gt]: new Date() },
-          { [Op.is]: null }
-        ]
+    const where = { status: 'publicada' };
       }
     };
     

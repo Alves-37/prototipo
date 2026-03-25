@@ -447,7 +447,7 @@ exports.listar = async (req, res) => {
         order: [[User.sequelize.literal('RANDOM()')]],
         limit: perTypeLimit,
         offset: perTypeOffset,
-        attributes: ['id', 'nome', 'tipo', 'foto', 'bio', 'localizacao', 'createdAt'],
+        attributes: ['id', 'nome', 'tipo', 'foto', 'bio', 'createdAt'],
       });
 
       users.forEach(user => {
@@ -457,7 +457,6 @@ exports.listar = async (req, res) => {
           id: raw.id,
           nome: raw.nome,
           bio: raw.bio,
-          localizacao: raw.localizacao,
           foto: raw.foto,
           createdAt: raw.createdAt,
         });
@@ -485,7 +484,7 @@ exports.listar = async (req, res) => {
         order: [[User.sequelize.literal('RANDOM()')]],
         limit: perTypeLimit,
         offset: perTypeOffset,
-        attributes: ['id', 'nome', 'tipo', 'logo', 'setor', 'tamanho', 'localizacao', 'createdAt'],
+        attributes: ['id', 'nome', 'tipo', 'logo', 'setor', 'tamanho', 'createdAt'],
       });
 
       companies.forEach(company => {
@@ -496,7 +495,6 @@ exports.listar = async (req, res) => {
           nome: raw.nome,
           setor: raw.setor,
           tamanho: raw.tamanho,
-          localizacao: raw.localizacao,
           logo: raw.logo,
           createdAt: raw.createdAt,
         });
@@ -612,7 +610,7 @@ exports.listarPessoas = async (req, res) => {
       order: [[User.sequelize.literal('RANDOM()')]],
       limit: limitNum,
       offset,
-      attributes: ['id', 'nome', 'tipo', 'foto', 'bio', 'localizacao', 'createdAt'],
+      attributes: ['id', 'nome', 'tipo', 'foto', 'bio', 'createdAt'],
     });
 
     return res.json({
@@ -649,7 +647,7 @@ exports.listarEmpresas = async (req, res) => {
       order: [[User.sequelize.literal('RANDOM()')]],
       limit: limitNum,
       offset,
-      attributes: ['id', 'nome', 'tipo', 'logo', 'setor', 'tamanho', 'localizacao', 'createdAt'],
+      attributes: ['id', 'nome', 'tipo', 'logo', 'setor', 'tamanho', 'createdAt'],
     });
 
     return res.json({

@@ -15,6 +15,131 @@ const normalizeImagens = (req, imagens) => {
   return [];
 };
 
+const getPublicBaseUrl = (req) => `${req.protocol}://${req.get('host')}`;
+
+const toAbsolute = (req, maybePath) => {
+  if (!maybePath) return null;
+  const f = String(maybePath);
+  if (f.startsWith('http://') || f.startsWith('https://') || f.startsWith('data:')) return f;
+  const baseUrl = getPublicBaseUrl(req);
+  const path = f.startsWith('/') ? f : `/${f}`;
+  return `${baseUrl}${path}`;
+};
+
+const toPublicUser = (req, u) => {
+  if (!u) return null;
+  const raw = typeof u.toJSON === 'function' ? u.toJSON() : u;
+
+  if (Object.prototype.hasOwnProperty.call(raw, 'perfilPublico') && raw.perfilPublico === false) {
+    return null;
+  }
+
+  let habilidades = [];
+  try {
+    if (Array.isArray(raw.habilidades)) {
+      habilidades = raw.habilidades;
+    } else if (typeof raw.habilidades === 'string') {
+      habilidades = JSON.parse(raw.habilidades);
+    }
+  } catch (e) {
+    habilidades = [];
+  }
+
+  let idiomas = [];
+  try {
+    if (Array.isArray(raw.idiomas)) {
+      idiomas = raw.idiomas;
+    } else if (typeof raw.idiomas === 'string') {
+      idiomas = JSON.parse(raw.idiomas);
+    }
+  } catch (e) {
+    idiomas = [];
+  }
+
+  let certificacoes = [];
+  try {
+    if (Array.isArray(raw.certificacoes)) {
+      certificacoes = raw.certificacoes;
+    } else if (typeof raw.certificacoes === 'string') {
+      certificacoes = JSON.parse(raw.certificacoes);
+    }
+  } catch (e) {
+    certificacoes = [];
+  }
+
+  let projetos = [];
+  try {
+    if (Array.isArray(raw.projetos)) {
+      projetos = raw.projetos;
+    } else if (typeof raw.projetos === 'string') {
+      projetos = JSON.parse(raw.projetos);
+    }
+  } catch (e) {
+    projetos = [];
+  }
+
+  let vagasInteresse = [];
+  try {
+    if (Array.isArray(raw.vagasInteresse)) {
+      vagasInteresse = raw.vagasInteresse;
+    } else if (typeof raw.vagasInteresse === 'string') {
+      vagasInteresse = JSON.parse(raw.vagasInteresse);
+    }
+  } catch (e) {
+    vagasInteresse = [];
+  }
+
+  const mostrarTelefone = Object.prototype.hasOwnProperty.call(raw, 'mostrarTelefone') ? !!raw.mostrarTelefone : false;
+  const mostrarEndereco = Object.prototype.hasOwnProperty.call(raw, 'mostrarEndereco') ? !!raw.mostrarEndereco : false;
+
+  return {
+    id: raw.id,
+    nome: raw.nome,
+    tipo: raw.tipo,
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt,
+    perfil: raw.tipo === 'empresa'
+      ? {
+          capa: toAbsolute(req, raw.capa),
+          logo: toAbsolute(req, raw.logo),
+          setor: raw.setor || null,
+          tamanho: raw.tamanho || null,
+          descricao: raw.descricao || null,
+          website: raw.website || null,
+          endereco: raw.endereco || null,
+        }
+      : {
+          foto: toAbsolute(req, raw.foto),
+          capa: toAbsolute(req, raw.capa),
+          bio: raw.bio || null,
+          experiencia: raw.experiencia || null,
+          formacao: raw.formacao || null,
+          instituicao: raw.instituicao || null,
+          resumo: raw.resumo || null,
+          habilidades,
+          idiomas,
+          certificacoes,
+          projetos,
+          vagasInteresse,
+          linkedin: raw.linkedin || null,
+          github: raw.github || null,
+          portfolio: raw.portfolio || null,
+          behance: raw.behance || null,
+          instagram: raw.instagram || null,
+          twitter: raw.twitter || null,
+          tipoTrabalho: raw.tipoTrabalho || null,
+          faixaSalarial: raw.faixaSalarial || null,
+          localizacaoPreferida: raw.localizacaoPreferida || null,
+          disponibilidade: raw.disponibilidade || null,
+          perfilPublico: Object.prototype.hasOwnProperty.call(raw, 'perfilPublico') ? !!raw.perfilPublico : true,
+          mostrarTelefone,
+          mostrarEndereco,
+          telefone: mostrarTelefone ? (raw.telefone || null) : null,
+          endereco: mostrarEndereco ? (raw.endereco || null) : null,
+        },
+  };
+};
+
 exports.listar = async (req, res) => {
   try {
     const { page = 1, limit = 20, tab = 'todos', q } = req.query;
@@ -413,6 +538,58 @@ exports.listar = async (req, res) => {
   } catch (error) {
     console.error('Erro ao listar feed:', error);
     return res.status(500).json({ error: 'Erro ao listar feed' });
+  }
+};
+
+exports.getPublicUserById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ error: 'ID inválido' });
+
+    const user = await User.findByPk(id);
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+
+    const pub = toPublicUser(req, user);
+    if (!pub) return res.status(404).json({ error: 'Usuário não encontrado' });
+
+    return res.json(pub);
+  } catch (err) {
+    console.error('Erro ao buscar usuário público:', err);
+    return res.status(500).json({ error: 'Erro ao buscar usuário' });
+  }
+};
+
+exports.listPublicUsers = async (req, res) => {
+  try {
+    const { tipo = 'todos', q = '', page = 1, limit = 20 } = req.query;
+
+    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+    const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 50);
+    const offset = (pageNum - 1) * limitNum;
+
+    const query = String(q || '').trim();
+
+    const where = {
+      ...(tipo !== 'todos' ? { tipo } : {}),
+      ...(query ? { nome: { [Op.like]: `%${query}%` } } : {}),
+    };
+
+    const { rows, count } = await User.findAndCountAll({
+      where,
+      order: [[User.sequelize.literal('RANDOM()')]],
+      limit: limitNum,
+      offset,
+    });
+
+    return res.json({
+      users: rows.map(u => toPublicUser(req, u)).filter(Boolean),
+      total: count,
+      page: pageNum,
+      totalPages: Math.ceil(count / limitNum),
+    });
+  } catch (err) {
+    console.error('Erro ao listar usuários públicos:', err);
+    return res.status(500).json({ error: 'Erro ao listar usuários' });
   }
 };
 

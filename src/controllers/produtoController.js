@@ -635,7 +635,7 @@ exports.list = async (req, res) => {
           attributes: ['id', 'nome', 'tipo', 'logo', 'foto'],
         },
       ],
-      order: [[Produto.sequelize.literal('RANDOM()')]],
+      order: Produto.sequelize.random(),
       limit: limitNum,
       offset,
     });

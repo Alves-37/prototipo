@@ -131,7 +131,7 @@ exports.listarTodas = async (req, res) => {
           attributes: ['id', 'nome', 'logo', 'setor', 'tamanho']
         }
       ],
-      order: [['dataPublicacao', 'DESC']],
+      order: Vaga.sequelize.random(),
       limit: parseInt(limit),
       offset: parseInt(offset)
     });
@@ -447,7 +447,7 @@ exports.listarPorEmpresa = async (req, res) => {
           attributes: ['id', 'nome', 'logo', 'setor', 'tamanho']
         }
       ],
-      order: [[Vaga.sequelize.literal('RANDOM()')]]
+      order: [['createdAt', 'DESC']]
     });
 
     res.json(vagas);

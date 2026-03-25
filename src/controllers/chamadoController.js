@@ -130,7 +130,7 @@ exports.listar = async (req, res) => {
           separate: true
         }
       ],
-      order: [[ordenar, direcao]],
+      order: Chamado.sequelize.random(),
       limit: parseInt(limit),
       offset: parseInt(offset),
       distinct: true

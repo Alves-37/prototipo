@@ -1,4 +1,5 @@
-const { User, Post, Vaga, Produto, Chamado, PostReaction, PostComment, ProdutoComment, Connection, Op } = require('../models');
+const { User, Post, Vaga, Produto, Chamado, PostReaction, PostComment, ProdutoComment, Op } = require('../models');
+const io = require('../socket');
 
 // Função auxiliar para normalizar imagens
 const normalizeImagens = (req, imagens) => {
@@ -13,25 +14,6 @@ const normalizeImagens = (req, imagens) => {
   }
   if (Array.isArray(imagens)) return imagens;
   return [];
-};
-
-const toPublicUser = (req, u) => {
-  if (!u) return null;
-  const raw = typeof u.toJSON === 'function' ? u.toJSON() : u;
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
-  return {
-    id: raw.id,
-    nome: raw.nome,
-    tipo: raw.tipo,
-    foto: raw.foto ? `${baseUrl}${raw.foto}` : null,
-    logo: raw.logo ? `${baseUrl}${raw.logo}` : null,
-    bio: raw.bio,
-    localizacao: raw.localizacao,
-    setor: raw.setor,
-    tamanho: raw.tamanho,
-    website: raw.website,
-    createdAt: raw.createdAt,
-  };
 };
 
 exports.listar = async (req, res) => {
@@ -506,94 +488,5 @@ exports.listarEmpresas = async (req, res) => {
   } catch (error) {
     console.error('Erro ao listar empresas:', error);
     return res.status(500).json({ error: 'Erro ao listar empresas' });
-  }
-};
-
-exports.getPublicUserById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    if (!id) return res.status(400).json({ error: 'ID inválido' });
-
-    const user = await User.findByPk(id);
-    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
-
-    const pub = toPublicUser(req, user);
-    if (!pub) return res.status(404).json({ error: 'Usuário não encontrado' });
-
-    const numericId = Number(id);
-    const userId = Number.isFinite(numericId) ? numericId : id;
-
-    const postsCount = await Post.count({ where: { userId } });
-
-    const connectionsCount = await Connection.count({
-      where: {
-        status: 'accepted',
-        [Op.or]: [
-          { requesterId: userId },
-          { addresseeId: userId },
-        ],
-      },
-    });
-
-    const followersCount = await Connection.count({
-      where: {
-        status: 'accepted',
-        addresseeId: userId,
-      },
-    });
-
-    const followingCount = await Connection.count({
-      where: {
-        status: 'accepted',
-        requesterId: userId,
-      },
-    });
-
-    return res.json({
-      ...pub,
-      stats: {
-        posts: postsCount,
-        connections: connectionsCount,
-        followers: followersCount,
-        following: followingCount,
-      },
-    });
-  } catch (err) {
-    console.error('Erro ao buscar usuário público:', err);
-    return res.status(500).json({ error: 'Erro ao buscar usuário' });
-  }
-};
-
-exports.listPublicUsers = async (req, res) => {
-  try {
-    const { tipo = 'todos', q = '', page = 1, limit = 20 } = req.query;
-
-    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
-    const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 50);
-    const offset = (pageNum - 1) * limitNum;
-
-    const query = String(q || '').trim();
-
-    const where = {
-      ...(tipo !== 'todos' ? { tipo } : {}),
-      ...(query ? { nome: { [Op.like]: `%${query}%` } } : {}),
-    };
-
-    const { rows, count } = await User.findAndCountAll({
-      where,
-      order: [[User.sequelize.literal('RANDOM()')]],
-      limit: limitNum,
-      offset,
-    });
-
-    return res.json({
-      users: rows.map(u => toPublicUser(req, u)).filter(Boolean),
-      total: count,
-      page: pageNum,
-      totalPages: Math.ceil(count / limitNum),
-    });
-  } catch (err) {
-    console.error('Erro ao listar usuários públicos:', err);
-    return res.status(500).json({ error: 'Erro ao listar usuários' });
   }
 };

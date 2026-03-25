@@ -447,7 +447,8 @@ exports.purgarContasExpiradas = async (req, res) => {
 exports.listar = async (req, res) => {
   try {
     const users = await User.findAll({
-      attributes: { exclude: ['senha'] }
+      attributes: { exclude: ['senha'] },
+      order: User.sequelize.random()
     });
     return res.json(users.map(u => filtrarCamposUsuario(u)));
   } catch (error) {

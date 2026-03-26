@@ -19,7 +19,7 @@ exports.listPublicUsers = async (req, res) => {
       order: [[User.sequelize.literal('RANDOM()')]],
       limit: limitNum,
       offset,
-      attributes: ['id', 'nome', 'tipo', 'foto', 'logo', 'bio', 'localizacao', 'createdAt'],
+      attributes: ['id', 'nome', 'tipo', 'foto', 'logo', 'bio', 'endereco', 'createdAt'],
     });
 
     return res.json({
@@ -42,7 +42,7 @@ exports.getPublicUserById = async (req, res) => {
     const { id } = req.params;
     
     const user = await User.findByPk(id, {
-      attributes: ['id', 'nome', 'tipo', 'foto', 'logo', 'bio', 'localizacao', 'setor', 'tamanho', 'createdAt'],
+      attributes: ['id', 'nome', 'tipo', 'foto', 'logo', 'bio', 'endereco', 'setor', 'tamanho', 'createdAt'],
     });
 
     if (!user) {

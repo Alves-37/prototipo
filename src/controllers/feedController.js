@@ -130,7 +130,7 @@ exports.listar = async (req, res) => {
       if (!shouldIncludeVagas) return;
 
       const vagaWhere = {
-        ativa: true,
+        status: 'publicada',
         ...(query
           ? {
               [Op.or]: [
@@ -178,7 +178,7 @@ exports.listar = async (req, res) => {
       if (!shouldIncludeServicos) return;
 
       const servicoWhere = {
-        ativo: true,
+        status: 'aberto',
         ...(query
           ? {
               [Op.or]: [
@@ -306,7 +306,7 @@ exports.listar = async (req, res) => {
       if (!shouldIncludePessoas) return;
 
       const userWhere = {
-        tipo: 'candidato',
+        tipo: 'usuario',
         ...(query
           ? {
               [Op.or]: [
@@ -426,7 +426,7 @@ exports.listarPessoas = async (req, res) => {
     const query = String(q || '').trim();
 
     const where = {
-      tipo: 'candidato',
+      tipo: 'usuario',
       ...(query ? { nome: { [Op.like]: `%${query}%` } } : {}),
     };
 

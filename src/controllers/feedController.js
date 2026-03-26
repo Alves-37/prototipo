@@ -1,4 +1,5 @@
 const { User, Post, Vaga, Produto, Chamado, PostReaction, PostComment, ProdutoComment, Op } = require('../models');
+const io = require('../socket');
 
 // Função auxiliar para normalizar imagens
 const normalizeImagens = (req, imagens) => {
@@ -15,140 +16,15 @@ const normalizeImagens = (req, imagens) => {
   return [];
 };
 
-const getPublicBaseUrl = (req) => `${req.protocol}://${req.get('host')}`;
-
-const toAbsolute = (req, maybePath) => {
-  if (!maybePath) return null;
-  const f = String(maybePath);
-  if (f.startsWith('http://') || f.startsWith('https://') || f.startsWith('data:')) return f;
-  const baseUrl = getPublicBaseUrl(req);
-  const path = f.startsWith('/') ? f : `/${f}`;
-  return `${baseUrl}${path}`;
-};
-
-const toPublicUser = (req, u) => {
-  if (!u) return null;
-  const raw = typeof u.toJSON === 'function' ? u.toJSON() : u;
-
-  if (Object.prototype.hasOwnProperty.call(raw, 'perfilPublico') && raw.perfilPublico === false) {
-    return null;
-  }
-
-  let habilidades = [];
-  try {
-    if (Array.isArray(raw.habilidades)) {
-      habilidades = raw.habilidades;
-    } else if (typeof raw.habilidades === 'string') {
-      habilidades = JSON.parse(raw.habilidades);
-    }
-  } catch (e) {
-    habilidades = [];
-  }
-
-  let idiomas = [];
-  try {
-    if (Array.isArray(raw.idiomas)) {
-      idiomas = raw.idiomas;
-    } else if (typeof raw.idiomas === 'string') {
-      idiomas = JSON.parse(raw.idiomas);
-    }
-  } catch (e) {
-    idiomas = [];
-  }
-
-  let certificacoes = [];
-  try {
-    if (Array.isArray(raw.certificacoes)) {
-      certificacoes = raw.certificacoes;
-    } else if (typeof raw.certificacoes === 'string') {
-      certificacoes = JSON.parse(raw.certificacoes);
-    }
-  } catch (e) {
-    certificacoes = [];
-  }
-
-  let projetos = [];
-  try {
-    if (Array.isArray(raw.projetos)) {
-      projetos = raw.projetos;
-    } else if (typeof raw.projetos === 'string') {
-      projetos = JSON.parse(raw.projetos);
-    }
-  } catch (e) {
-    projetos = [];
-  }
-
-  let vagasInteresse = [];
-  try {
-    if (Array.isArray(raw.vagasInteresse)) {
-      vagasInteresse = raw.vagasInteresse;
-    } else if (typeof raw.vagasInteresse === 'string') {
-      vagasInteresse = JSON.parse(raw.vagasInteresse);
-    }
-  } catch (e) {
-    vagasInteresse = [];
-  }
-
-  const mostrarTelefone = Object.prototype.hasOwnProperty.call(raw, 'mostrarTelefone') ? !!raw.mostrarTelefone : false;
-  const mostrarEndereco = Object.prototype.hasOwnProperty.call(raw, 'mostrarEndereco') ? !!raw.mostrarEndereco : false;
-
-  return {
-    id: raw.id,
-    nome: raw.nome,
-    tipo: raw.tipo,
-    createdAt: raw.createdAt,
-    updatedAt: raw.updatedAt,
-    perfil: raw.tipo === 'empresa'
-      ? {
-          capa: toAbsolute(req, raw.capa),
-          logo: toAbsolute(req, raw.logo),
-          setor: raw.setor || null,
-          tamanho: raw.tamanho || null,
-          descricao: raw.descricao || null,
-          website: raw.website || null,
-          endereco: raw.endereco || null,
-        }
-      : {
-          foto: toAbsolute(req, raw.foto),
-          capa: toAbsolute(req, raw.capa),
-          bio: raw.bio || null,
-          experiencia: raw.experiencia || null,
-          formacao: raw.formacao || null,
-          instituicao: raw.instituicao || null,
-          resumo: raw.resumo || null,
-          habilidades,
-          idiomas,
-          certificacoes,
-          projetos,
-          vagasInteresse,
-          linkedin: raw.linkedin || null,
-          github: raw.github || null,
-          portfolio: raw.portfolio || null,
-          behance: raw.behance || null,
-          instagram: raw.instagram || null,
-          twitter: raw.twitter || null,
-          tipoTrabalho: raw.tipoTrabalho || null,
-          faixaSalarial: raw.faixaSalarial || null,
-          localizacaoPreferida: raw.localizacaoPreferida || null,
-          disponibilidade: raw.disponibilidade || null,
-          perfilPublico: Object.prototype.hasOwnProperty.call(raw, 'perfilPublico') ? !!raw.perfilPublico : true,
-          mostrarTelefone,
-          mostrarEndereco,
-          telefone: mostrarTelefone ? (raw.telefone || null) : null,
-          endereco: mostrarEndereco ? (raw.endereco || null) : null,
-        },
-  };
-};
-
 exports.listar = async (req, res) => {
   try {
     const { page = 1, limit = 20, tab = 'todos', q } = req.query;
     const pageNum = Math.max(parseInt(page, 10) || 1, 1);
     const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 50);
-    // tab=todos junta múltiplos tipos (posts/vagas/servicos/vendas). Se usarmos limitNum para cada tipo,
-    // acabamos buscando 4x mais dados que o necessário, aumentando muito o tempo de resposta.
-    const perTypeLimit = tab === 'todos' ? Math.max(1, Math.ceil(limitNum / 2)) : limitNum;
-    const perTypeOffset = (pageNum - 1) * perTypeLimit;
+    
+    // Para feed estilo Facebook, buscar mais itens e depois embaralhar
+    const fetchLimit = tab === 'todos' ? limitNum * 4 : limitNum;
+    const offset = (pageNum - 1) * fetchLimit;
 
     const query = String(q || '').trim();
 
@@ -183,8 +59,8 @@ exports.listar = async (req, res) => {
           },
         ],
         order: [[Post.sequelize.literal('RANDOM()')]],
-        limit: perTypeLimit,
-        offset: perTypeOffset,
+        limit: fetchLimit,
+        offset: 0, // Sem offset para melhor aleatoriedade
       });
 
       const postIds = posts.map(p => p.id);
@@ -255,10 +131,7 @@ exports.listar = async (req, res) => {
       if (!shouldIncludeVagas) return;
 
       const vagaWhere = {
-        status: 'publicada',
-        dataExpiracao: {
-          [Op.or]: [{ [Op.gt]: new Date() }, { [Op.is]: null }],
-        },
+        ativa: true,
         ...(query
           ? {
               [Op.or]: [
@@ -279,8 +152,8 @@ exports.listar = async (req, res) => {
           },
         ],
         order: [[Vaga.sequelize.literal('RANDOM()')]],
-        limit: perTypeLimit,
-        offset: perTypeOffset,
+        limit: fetchLimit,
+        offset: 0, // Sem offset para melhor aleatoriedade
       });
 
       vagas.forEach(vaga => {
@@ -327,8 +200,8 @@ exports.listar = async (req, res) => {
           },
         ],
         order: [[Chamado.sequelize.literal('RANDOM()')]],
-        limit: perTypeLimit,
-        offset: perTypeOffset,
+        limit: fetchLimit,
+        offset: 0, // Sem offset para melhor aleatoriedade
       });
 
       servicos.forEach(servico => {
@@ -374,8 +247,8 @@ exports.listar = async (req, res) => {
           },
         ],
         order: [[Produto.sequelize.literal('RANDOM()')]],
-        limit: perTypeLimit,
-        offset: perTypeOffset,
+        limit: fetchLimit,
+        offset: 0, // Sem offset para melhor aleatoriedade
       });
 
       const produtoIds = produtos.map(p => p.id);
@@ -448,9 +321,9 @@ exports.listar = async (req, res) => {
       const users = await User.findAll({
         where: userWhere,
         order: [[User.sequelize.literal('RANDOM()')]],
-        limit: perTypeLimit,
-        offset: perTypeOffset,
-        attributes: ['id', 'nome', 'tipo', 'foto', 'bio', 'createdAt'],
+        limit: fetchLimit,
+        offset: 0, // Sem offset para melhor aleatoriedade
+        attributes: ['id', 'nome', 'tipo', 'foto', 'bio', 'localizacao', 'createdAt'],
       });
 
       users.forEach(user => {
@@ -460,6 +333,7 @@ exports.listar = async (req, res) => {
           id: raw.id,
           nome: raw.nome,
           bio: raw.bio,
+          localizacao: raw.localizacao,
           foto: raw.foto,
           createdAt: raw.createdAt,
         });
@@ -485,9 +359,9 @@ exports.listar = async (req, res) => {
       const companies = await User.findAll({
         where: companyWhere,
         order: [[User.sequelize.literal('RANDOM()')]],
-        limit: perTypeLimit,
-        offset: perTypeOffset,
-        attributes: ['id', 'nome', 'tipo', 'logo', 'setor', 'tamanho', 'createdAt'],
+        limit: fetchLimit,
+        offset: 0, // Sem offset para melhor aleatoriedade
+        attributes: ['id', 'nome', 'tipo', 'logo', 'setor', 'tamanho', 'localizacao', 'createdAt'],
       });
 
       companies.forEach(company => {
@@ -498,6 +372,7 @@ exports.listar = async (req, res) => {
           nome: raw.nome,
           setor: raw.setor,
           tamanho: raw.tamanho,
+          localizacao: raw.localizacao,
           logo: raw.logo,
           createdAt: raw.createdAt,
         });
@@ -514,15 +389,13 @@ exports.listar = async (req, res) => {
       fetchEmpresas(),
     ]);
 
-    // Embaralhar itens quando tab=todos para misturar os tipos
-    if (tab === 'todos') {
-      for (let i = items.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [items[i], items[j]] = [items[j], items[i]];
-      }
+    // Embaralhar todos os itens para estilo Facebook
+    for (let i = items.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [items[i], items[j]] = [items[j], items[i]];
     }
 
-    // Paginação final
+    // Paginação final após embaralhar
     const startIndex = (pageNum - 1) * limitNum;
     const endIndex = startIndex + limitNum;
     const paginatedItems = items.slice(startIndex, endIndex);
@@ -539,58 +412,6 @@ exports.listar = async (req, res) => {
   } catch (error) {
     console.error('Erro ao listar feed:', error);
     return res.status(500).json({ error: 'Erro ao listar feed' });
-  }
-};
-
-exports.getPublicUserById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    if (!id) return res.status(400).json({ error: 'ID inválido' });
-
-    const user = await User.findByPk(id);
-    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
-
-    const pub = toPublicUser(req, user);
-    if (!pub) return res.status(404).json({ error: 'Usuário não encontrado' });
-
-    return res.json(pub);
-  } catch (err) {
-    console.error('Erro ao buscar usuário público:', err);
-    return res.status(500).json({ error: 'Erro ao buscar usuário' });
-  }
-};
-
-exports.listPublicUsers = async (req, res) => {
-  try {
-    const { tipo = 'todos', q = '', page = 1, limit = 20 } = req.query;
-
-    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
-    const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 50);
-    const offset = (pageNum - 1) * limitNum;
-
-    const query = String(q || '').trim();
-
-    const where = {
-      ...(tipo !== 'todos' ? { tipo } : {}),
-      ...(query ? { nome: { [Op.like]: `%${query}%` } } : {}),
-    };
-
-    const { rows, count } = await User.findAndCountAll({
-      where,
-      order: [[User.sequelize.literal('RANDOM()')]],
-      limit: limitNum,
-      offset,
-    });
-
-    return res.json({
-      users: rows.map(u => toPublicUser(req, u)).filter(Boolean),
-      total: count,
-      page: pageNum,
-      totalPages: Math.ceil(count / limitNum),
-    });
-  } catch (err) {
-    console.error('Erro ao listar usuários públicos:', err);
-    return res.status(500).json({ error: 'Erro ao listar usuários' });
   }
 };
 
@@ -613,7 +434,7 @@ exports.listarPessoas = async (req, res) => {
       order: [[User.sequelize.literal('RANDOM()')]],
       limit: limitNum,
       offset,
-      attributes: ['id', 'nome', 'tipo', 'foto', 'bio', 'createdAt'],
+      attributes: ['id', 'nome', 'tipo', 'foto', 'bio', 'localizacao', 'createdAt'],
     });
 
     return res.json({
@@ -650,7 +471,7 @@ exports.listarEmpresas = async (req, res) => {
       order: [[User.sequelize.literal('RANDOM()')]],
       limit: limitNum,
       offset,
-      attributes: ['id', 'nome', 'tipo', 'logo', 'setor', 'tamanho', 'createdAt'],
+      attributes: ['id', 'nome', 'tipo', 'logo', 'setor', 'tamanho', 'localizacao', 'createdAt'],
     });
 
     return res.json({

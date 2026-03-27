@@ -1,5 +1,10 @@
 const { User, Post, Vaga, Produto, Chamado, PostReaction, PostComment, ProdutoComment, Op } = require('../models');
-const io = require('../socket');
+let io = null;
+try {
+  io = require('../socket');
+} catch {
+  io = null;
+}
 
 // Função auxiliar para normalizar imagens
 const normalizeImagens = (req, imagens) => {

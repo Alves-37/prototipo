@@ -1,4 +1,5 @@
-const { User, Post, Vaga, Produto, Chamado, PostReaction, PostComment, ProdutoComment, Op, sequelize } = require('../models');
+const { User, Post, Vaga, Produto, Chamado, PostReaction, PostComment, ProdutoComment, Op } = require('../models');
+const io = require('../socket');
 
 // Função auxiliar para normalizar imagens
 const normalizeImagens = (req, imagens) => {
@@ -15,253 +16,49 @@ const normalizeImagens = (req, imagens) => {
   return [];
 };
 
-// NOVO: Feed verdadeiramente aleatório como Facebook
-exports.getFeed = async (req, res) => {
-  try {
-    const { page = 1, limit = 20, tab = 'todos', q } = req.query;
-    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
-    const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 50);
-    const offset = (pageNum - 1) * limitNum;
+// Shuffle determinístico (Fisher–Yates) baseado em seed
+const createSeededRandom = (seed) => {
+  // mulberry32
+  let t = (Number(seed) || 0) >>> 0;
+  return () => {
+    t += 0x6D2B79F5;
+    let x = Math.imul(t ^ (t >>> 15), 1 | t);
+    x ^= x + Math.imul(x ^ (x >>> 7), 61 | x);
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+};
 
-    const query = String(q || '').trim();
-
-    // Se não for tab=todos, usa as funções originais para tipos específicos
-    if (tab !== 'todos') {
-      return exports.listar(req, res);
-    }
-
-    // Para tab=todos, cria uma query UNION verdadeiramente aleatória
-    const postQuery = `
-      SELECT 
-        'post' as type,
-        p.id,
-        p.texto,
-        p.imageUrl,
-        p.videoUrl,
-        p.postType,
-        p.createdAt,
-        p.updatedAt,
-        JSON_OBJECT(
-          'id', u.id,
-          'nome', u.nome,
-          'tipo', u.tipo,
-          'foto', u.foto,
-          'logo', u.logo
-        ) as author,
-        0 as reactions,
-        0 as comments,
-        NULL as myReaction
-      FROM posts p
-      JOIN users u ON p.userId = u.id
-      WHERE p.isHidden = false ${query ? `AND (p.texto ILIKE '%${query}%')` : ''}
-    `;
-
-    const vagaQuery = `
-      SELECT 
-        'vaga' as type,
-        v.id,
-        v.titulo as texto,
-        NULL as imageUrl,
-        NULL as videoUrl,
-        NULL as postType,
-        v.createdAt,
-        v.updatedAt,
-        JSON_OBJECT(
-          'id', u.id,
-          'nome', u.nome,
-          'tipo', u.tipo,
-          'foto', u.foto,
-          'logo', u.logo
-        ) as empresa,
-        NULL as reactions,
-        NULL as comments,
-        NULL as myReaction
-      FROM vagas v
-      JOIN users u ON v.empresaId = u.id
-      WHERE v.status = 'publicada' ${query ? `AND (v.titulo ILIKE '%${query}%' OR v.descricao ILIKE '%${query}%')` : ''}
-    `;
-
-    const servicoQuery = `
-      SELECT 
-        'servico' as type,
-        c.id,
-        c.titulo as texto,
-        NULL as imageUrl,
-        NULL as videoUrl,
-        NULL as postType,
-        c.createdAt,
-        c.updatedAt,
-        JSON_OBJECT(
-          'id', u.id,
-          'nome', u.nome,
-          'tipo', u.tipo,
-          'foto', u.foto,
-          'logo', u.logo
-        ) as usuario,
-        NULL as reactions,
-        NULL as comments,
-        NULL as myReaction
-      FROM chamados c
-      JOIN users u ON c.usuarioId = u.id
-      WHERE c.status = 'aberto' ${query ? `AND (c.titulo ILIKE '%${query}%' OR c.descricao ILIKE '%${query}%')` : ''}
-    `;
-
-    const produtoQuery = `
-      SELECT 
-        'produto' as type,
-        p.id,
-        p.nome as texto,
-        NULL as imageUrl,
-        NULL as videoUrl,
-        NULL as postType,
-        p.createdAt,
-        p.updatedAt,
-        JSON_OBJECT(
-          'id', u.id,
-          'nome', u.nome,
-          'tipo', u.tipo,
-          'foto', u.foto,
-          'logo', u.logo
-        ) as empresa,
-        0 as reactions,
-        0 as comments,
-        NULL as myReaction
-      FROM produtos p
-      JOIN users u ON p.empresaId = u.id
-      WHERE p.ativo = true ${query ? `AND (p.nome ILIKE '%${query}%' OR p.descricao ILIKE '%${query}%')` : ''}
-    `;
-
-    const finalQuery = `
-      SELECT * FROM (
-        ${postQuery}
-        UNION ALL
-        ${vagaQuery}
-        UNION ALL
-        ${servicoQuery}
-        UNION ALL
-        ${produtoQuery}
-      ) as combined_items
-      ORDER BY RANDOM()
-      LIMIT ${limitNum} OFFSET ${offset}
-    `;
-
-    const [results] = await sequelize.query(finalQuery);
-
-    // Processar resultados
-    const items = [];
-    const postIds = [];
-    const produtoIds = [];
-
-    results.forEach(row => {
-      items.push({
-        ...row,
-        author: row.author ? JSON.parse(row.author) : null,
-        empresa: row.empresa ? JSON.parse(row.empresa) : null,
-        usuario: row.usuario ? JSON.parse(row.usuario) : null,
-      });
-
-      if (row.type === 'post') postIds.push(row.id);
-      if (row.type === 'produto') produtoIds.push(row.id);
-    });
-
-    // Buscar contagens para posts (se necessário)
-    if (postIds.length > 0) {
-      const [reactionCounts, commentCounts, myReactions] = await Promise.all([
-        sequelize.query(`
-          SELECT postId, COUNT(*) as count 
-          FROM post_reactions 
-          WHERE postId IN (${postIds.join(',')})
-          GROUP BY postId
-        `, { type: sequelize.QueryTypes.SELECT }),
-        
-        sequelize.query(`
-          SELECT postId, COUNT(*) as count 
-          FROM post_comments 
-          WHERE postId IN (${postIds.join(',')})
-          GROUP BY postId
-        `, { type: sequelize.QueryTypes.SELECT }),
-        
-        req.user ? sequelize.query(`
-          SELECT postId, tipo 
-          FROM post_reactions 
-          WHERE userId = ${req.user.id} AND postId IN (${postIds.join(',')})
-        `, { type: sequelize.QueryTypes.SELECT }) : Promise.resolve([])
-      ]);
-
-      const reactionMap = reactionCounts.reduce((acc, r) => {
-        acc[r.postId] = parseInt(r.count, 10);
-        return acc;
-      }, {});
-
-      const commentMap = commentCounts.reduce((acc, c) => {
-        acc[c.postId] = parseInt(c.count, 10);
-        return acc;
-      }, {});
-
-      const myReactionMap = myReactions.reduce((acc, r) => {
-        acc[r.postId] = r.tipo;
-        return acc;
-      }, {});
-
-      // Atualizar contagens nos itens
-      items.forEach(item => {
-        if (item.type === 'post') {
-          item.stats = {
-            reactions: reactionMap[item.id] || 0,
-            comments: commentMap[item.id] || 0,
-          };
-          item.myReaction = myReactionMap[item.id] || null;
-        }
-      });
-    }
-
-    // Buscar contagens para produtos (se necessário)
-    if (produtoIds.length > 0) {
-      const [commentCounts] = await Promise.all([
-        sequelize.query(`
-          SELECT produtoId, COUNT(*) as count 
-          FROM produto_comments 
-          WHERE produtoId IN (${produtoIds.join(',')})
-          GROUP BY produtoId
-        `, { type: sequelize.QueryTypes.SELECT })
-      ]);
-
-      const commentMap = commentCounts.reduce((acc, c) => {
-        acc[c.produtoId] = parseInt(c.count, 10);
-        return acc;
-      }, {});
-
-      // Atualizar contagens nos itens
-      items.forEach(item => {
-        if (item.type === 'produto') {
-          item.stats = {
-            comments: commentMap[item.id] || 0,
-          };
-        }
-      });
-    }
-
-    // Contar total para paginação (simplificado)
-    const total = items.length >= limitNum ? limitNum * (pageNum + 1) : items.length + offset;
-
-    return res.json({
-      items,
-      pagination: {
-        page: pageNum,
-        limit: limitNum,
-        total,
-        pages: Math.ceil(total / limitNum),
-      },
-    });
-  } catch (error) {
-    console.error('Erro ao listar feed:', error);
-    return res.status(500).json({ error: 'Erro ao listar feed' });
+const hashStringToSeed = (str) => {
+  const s = String(str || '');
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i += 1) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
   }
+  return h >>> 0;
+};
+
+const seededShuffleInPlace = (arr, rand) => {
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rand() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+};
+
+const seededOrderKey = (seedNum, type, id) => {
+  const base = `${seedNum}:${String(type || '')}:${String(id ?? '')}`;
+  return hashStringToSeed(base);
+};
+
+const seededSortItemsByKey = (arr, seedNum, type) => {
+  const list = Array.isArray(arr) ? arr : [];
+  return [...list].sort((a, b) => seededOrderKey(seedNum, type, a?.id) - seededOrderKey(seedNum, type, b?.id));
 };
 
 exports.listar = async (req, res) => {
   try {
-    const { page = 1, limit = 20, tab = 'todos', q } = req.query;
+    const { page = 1, limit = 20, tab = 'todos', q, seed } = req.query;
     const pageNum = Math.max(parseInt(page, 10) || 1, 1);
     const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 50);
     // tab=todos junta múltiplos tipos (posts/vagas/servicos/vendas). Se usarmos limitNum para cada tipo,
@@ -270,6 +67,14 @@ exports.listar = async (req, res) => {
     const perTypeOffset = (pageNum - 1) * perTypeLimit;
 
     const query = String(q || '').trim();
+
+    // Seed recomendado: vindo do frontend (persistido em localStorage por sessão)
+    // Fallback: combina userId (se existir) + tab + query para manter consistência
+    const seedStr = seed !== undefined && seed !== null && String(seed).trim() !== ''
+      ? String(seed)
+      : `${req.user?.id || 'anon'}:${tab}:${query}`;
+    const seedNum = hashStringToSeed(seedStr);
+    const rand = createSeededRandom(seedNum);
 
     const items = [];
 
@@ -301,12 +106,14 @@ exports.listar = async (req, res) => {
             attributes: ['id', 'nome', 'tipo', 'foto', 'logo'],
           },
         ],
-        order: [[Post.sequelize.literal('RANDOM()')]],
+        order: [['id', 'DESC']],
         limit: perTypeLimit,
         offset: perTypeOffset,
       });
 
-      const postIds = posts.map(p => p.id);
+      const orderedPosts = seededSortItemsByKey(posts, seedNum, 'post');
+
+      const postIds = orderedPosts.map(p => p.id);
 
       const [reactionCounts, commentCounts, myReactions] = await Promise.all([
         postIds.length
@@ -349,7 +156,7 @@ exports.listar = async (req, res) => {
         return acc;
       }, {});
 
-      posts.forEach(post => {
+      orderedPosts.forEach(post => {
         const raw = typeof post.toJSON === 'function' ? post.toJSON() : post;
         items.push({
           type: 'post',
@@ -374,7 +181,7 @@ exports.listar = async (req, res) => {
       if (!shouldIncludeVagas) return;
 
       const vagaWhere = {
-        status: 'publicada',
+        ativa: true,
         ...(query
           ? {
               [Op.or]: [
@@ -394,12 +201,14 @@ exports.listar = async (req, res) => {
             attributes: ['id', 'nome', 'tipo', 'foto', 'logo'],
           },
         ],
-        order: [[Vaga.sequelize.literal('RANDOM()')]],
+        order: [['id', 'DESC']],
         limit: perTypeLimit,
         offset: perTypeOffset,
       });
 
-      vagas.forEach(vaga => {
+      const orderedVagas = seededSortItemsByKey(vagas, seedNum, 'vaga');
+
+      orderedVagas.forEach(vaga => {
         const raw = typeof vaga.toJSON === 'function' ? vaga.toJSON() : vaga;
         items.push({
           type: 'vaga',
@@ -408,7 +217,7 @@ exports.listar = async (req, res) => {
           descricao: raw.descricao,
           requisitos: raw.requisitos,
           beneficios: raw.beneficios,
-          endereco: raw.endereco,
+          localizacao: raw.localizacao,
           modalidade: raw.modalidade,
           salario: raw.salario,
           createdAt: raw.createdAt,
@@ -422,7 +231,7 @@ exports.listar = async (req, res) => {
       if (!shouldIncludeServicos) return;
 
       const servicoWhere = {
-        status: 'aberto',
+        ativo: true,
         ...(query
           ? {
               [Op.or]: [
@@ -442,12 +251,14 @@ exports.listar = async (req, res) => {
             attributes: ['id', 'nome', 'tipo', 'foto', 'logo'],
           },
         ],
-        order: [[Chamado.sequelize.literal('RANDOM()')]],
+        order: [['id', 'DESC']],
         limit: perTypeLimit,
         offset: perTypeOffset,
       });
 
-      servicos.forEach(servico => {
+      const orderedServicos = seededSortItemsByKey(servicos, seedNum, 'servico');
+
+      orderedServicos.forEach(servico => {
         const raw = typeof servico.toJSON === 'function' ? servico.toJSON() : servico;
         items.push({
           type: 'servico',
@@ -455,7 +266,7 @@ exports.listar = async (req, res) => {
           titulo: raw.titulo,
           descricao: raw.descricao,
           categoria: raw.categoria,
-          endereco: raw.endereco,
+          localizacao: raw.localizacao,
           orcamento: raw.orcamento,
           prazo: raw.prazo,
           createdAt: raw.createdAt,
@@ -489,14 +300,16 @@ exports.listar = async (req, res) => {
             attributes: ['id', 'nome', 'tipo', 'foto', 'logo'],
           },
         ],
-        order: [[Produto.sequelize.literal('RANDOM()')]],
+        order: [['id', 'DESC']],
         limit: perTypeLimit,
         offset: perTypeOffset,
       });
 
-      const produtoIds = produtos.map(p => p.id);
+      const orderedProdutos = seededSortItemsByKey(produtos, seedNum, 'produto');
 
-      const [reactionCounts, myReactions] = await Promise.all([
+      const produtoIds = orderedProdutos.map(p => p.id);
+
+      const [reactionCounts, commentCounts, myReactions] = await Promise.all([
         produtoIds.length
           ? ProdutoComment.findAll({
               attributes: ['produtoId', [ProdutoComment.sequelize.fn('COUNT', ProdutoComment.sequelize.col('id')), 'count']],
@@ -524,7 +337,7 @@ exports.listar = async (req, res) => {
         return acc;
       }, {});
 
-      produtos.forEach(produto => {
+      orderedProdutos.forEach(produto => {
         const raw = typeof produto.toJSON === 'function' ? produto.toJSON() : produto;
         items.push({
           type: 'produto',
@@ -550,7 +363,7 @@ exports.listar = async (req, res) => {
       if (!shouldIncludePessoas) return;
 
       const userWhere = {
-        tipo: 'usuario',
+        tipo: 'candidato',
         ...(query
           ? {
               [Op.or]: [
@@ -563,20 +376,22 @@ exports.listar = async (req, res) => {
 
       const users = await User.findAll({
         where: userWhere,
-        order: [[User.sequelize.literal('RANDOM()')]],
+        order: [['id', 'DESC']],
         limit: perTypeLimit,
         offset: perTypeOffset,
-        attributes: ['id', 'nome', 'tipo', 'foto', 'bio', 'endereco', 'createdAt'],
+        attributes: ['id', 'nome', 'tipo', 'foto', 'bio', 'localizacao', 'createdAt'],
       });
 
-      users.forEach(user => {
+      const orderedUsers = seededSortItemsByKey(users, seedNum, 'pessoa');
+
+      orderedUsers.forEach(user => {
         const raw = typeof user.toJSON === 'function' ? user.toJSON() : user;
         items.push({
           type: 'pessoa',
           id: raw.id,
           nome: raw.nome,
           bio: raw.bio,
-          endereco: raw.endereco,
+          localizacao: raw.localizacao,
           foto: raw.foto,
           createdAt: raw.createdAt,
         });
@@ -601,13 +416,15 @@ exports.listar = async (req, res) => {
 
       const companies = await User.findAll({
         where: companyWhere,
-        order: [[User.sequelize.literal('RANDOM()')]],
+        order: [['id', 'DESC']],
         limit: perTypeLimit,
         offset: perTypeOffset,
-        attributes: ['id', 'nome', 'tipo', 'logo', 'setor', 'tamanho', 'endereco', 'createdAt'],
+        attributes: ['id', 'nome', 'tipo', 'logo', 'setor', 'tamanho', 'localizacao', 'createdAt'],
       });
 
-      companies.forEach(company => {
+      const orderedCompanies = seededSortItemsByKey(companies, seedNum, 'empresa');
+
+      orderedCompanies.forEach(company => {
         const raw = typeof company.toJSON === 'function' ? company.toJSON() : company;
         items.push({
           type: 'empresa',
@@ -615,7 +432,7 @@ exports.listar = async (req, res) => {
           nome: raw.nome,
           setor: raw.setor,
           tamanho: raw.tamanho,
-          endereco: raw.endereco,
+          localizacao: raw.localizacao,
           logo: raw.logo,
           createdAt: raw.createdAt,
         });
@@ -632,12 +449,9 @@ exports.listar = async (req, res) => {
       fetchEmpresas(),
     ]);
 
-    // Embaralhar itens quando tab=todos para misturar os tipos
+    // Misturar itens quando tab=todos de forma determinística (seed)
     if (tab === 'todos') {
-      for (let i = items.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [items[i], items[j]] = [items[j], items[i]];
-      }
+      seededShuffleInPlace(items, rand);
     }
 
     // Paginação final
@@ -670,7 +484,7 @@ exports.listarPessoas = async (req, res) => {
     const query = String(q || '').trim();
 
     const where = {
-      tipo: 'usuario',
+      tipo: 'candidato',
       ...(query ? { nome: { [Op.like]: `%${query}%` } } : {}),
     };
 
@@ -679,7 +493,7 @@ exports.listarPessoas = async (req, res) => {
       order: [[User.sequelize.literal('RANDOM()')]],
       limit: limitNum,
       offset,
-      attributes: ['id', 'nome', 'tipo', 'foto', 'bio', 'endereco', 'createdAt'],
+      attributes: ['id', 'nome', 'tipo', 'foto', 'bio', 'localizacao', 'createdAt'],
     });
 
     return res.json({
@@ -716,7 +530,7 @@ exports.listarEmpresas = async (req, res) => {
       order: [[User.sequelize.literal('RANDOM()')]],
       limit: limitNum,
       offset,
-      attributes: ['id', 'nome', 'tipo', 'logo', 'setor', 'tamanho', 'endereco', 'createdAt'],
+      attributes: ['id', 'nome', 'tipo', 'logo', 'setor', 'tamanho', 'localizacao', 'createdAt'],
     });
 
     return res.json({

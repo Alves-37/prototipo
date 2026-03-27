@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const publicUserController = require('../controllers/publicUserController');
+const feedController = require('../controllers/feedController');
 
-router.get('/users', publicUserController.listPublicUsers);
-router.get('/users/:id', publicUserController.getPublicUserById);
+router.get('/users', feedController.listPublicUsers);
+router.get('/users/:id', feedController.getPublicUserById);
 
 module.exports = router;

@@ -451,13 +451,21 @@ exports.listar = async (req, res) => {
     };
 
     // Executar todas as buscas em paralelo
+    const safe = async (label, fn) => {
+      try {
+        await fn();
+      } catch (err) {
+        console.error(`Erro ao buscar ${label} no feed:`, err && (err.original?.message || err.parent?.message || err.message) ? (err.original?.message || err.parent?.message || err.message) : err);
+      }
+    };
+
     await Promise.all([
-      fetchPosts(),
-      fetchVagas(),
-      fetchServicos(),
-      fetchVendas(),
-      fetchPessoas(),
-      fetchEmpresas(),
+      safe('posts', fetchPosts),
+      safe('vagas', fetchVagas),
+      safe('servicos', fetchServicos),
+      safe('vendas', fetchVendas),
+      safe('pessoas', fetchPessoas),
+      safe('empresas', fetchEmpresas),
     ]);
 
     // Misturar itens quando tab=todos de forma determinística (seed)

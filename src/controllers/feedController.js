@@ -186,7 +186,13 @@ exports.listar = async (req, res) => {
       if (!shouldIncludeVagas) return;
 
       const vagaWhere = {
-        ativa: true,
+        status: 'publicada',
+        dataExpiracao: {
+          [Op.or]: [
+            { [Op.gt]: new Date() },
+            { [Op.is]: null },
+          ],
+        },
         ...(query
           ? {
               [Op.or]: [
@@ -236,7 +242,7 @@ exports.listar = async (req, res) => {
       if (!shouldIncludeServicos) return;
 
       const servicoWhere = {
-        ativo: true,
+        status: 'aberto',
         ...(query
           ? {
               [Op.or]: [
@@ -289,7 +295,7 @@ exports.listar = async (req, res) => {
         ...(query
           ? {
               [Op.or]: [
-                { nome: { [Op.like]: `%${query}%` } },
+                { titulo: { [Op.like]: `%${query}%` } },
                 { descricao: { [Op.like]: `%${query}%` } },
               ],
             }
@@ -347,11 +353,11 @@ exports.listar = async (req, res) => {
         items.push({
           type: 'produto',
           id: raw.id,
-          nome: raw.nome,
+          nome: raw.titulo,
           descricao: raw.descricao,
           preco: raw.preco,
           categoria: raw.categoria,
-          estoque: raw.estoque,
+          estoque: raw.estoqueQtd,
           imagens: normalizeImagens(req, raw.imagens),
           createdAt: raw.createdAt,
           updatedAt: raw.updatedAt,
@@ -368,7 +374,7 @@ exports.listar = async (req, res) => {
       if (!shouldIncludePessoas) return;
 
       const userWhere = {
-        tipo: 'candidato',
+        tipo: 'usuario',
         ...(query
           ? {
               [Op.or]: [
